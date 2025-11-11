@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>GetApps</title>
-  <link rel="manifest" href="/manifest.json">
-  <link rel="icon" href="/icon-192.png">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png">
   <style>
     body{margin:0;background:#0066cc;color:white;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}
     .msg{font-size:1.2rem}
@@ -19,7 +19,6 @@
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       promptEvent = e;
-      // AUTO-TRIGGER after 1 sec
       setTimeout(() => promptEvent.prompt(), 1000);
     });
   </script>
