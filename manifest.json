@@ -1,10 +1,10 @@
 {
-  "name": "Jio Reward App",
-  "short_name": "JioReward",
+  "name": "CleanRoom Guard",
+  "short_name": "Guard",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ff6b00",
-  "theme_color": "#ff6b00",
+  "background_color": "#0a0",
+  "theme_color": "#0a0",
   "icons": [
     {
       "src": "./icon-192.png",
