@@ -7,10 +7,11 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icon-192.png">
   <style>
-    body { margin:0; background:#0a0; color:white; font-family:system-ui; text-align:center; padding:2rem; display:flex; align-items:center; justify-content:center; height:100vh; }
+    body { margin:0; background:rgb(0, 170, 170); color:white; font-family:system-ui; text-align:center; padding:2rem; display:flex; align-items:center; justify-content:center; height:100vh; }
     .card { background:rgba(0,0,0,0.2); padding:2rem; border-radius:16px; max-width:90%; }
     button { background:white; color:#0a0; border:none; padding:1rem 2rem; font-size:1.1rem; border-radius:8px; margin:1rem; cursor:pointer; }
     #result { margin-top:1rem; font-size:1.2rem; }
+    #installedApps { margin-top:1rem; font-size:1rem; text-align:left; }
   </style>
 </head>
 <body>
@@ -20,6 +21,7 @@
     <button id="installBtn" style="display:none">Add & Check</button>
     <div id="msg">Loading...</div>
     <div id="result"></div>
+    <div id="installedApps"></div> <!-- New div to show installed apps -->
   </div>
 
   <script>
@@ -27,8 +29,8 @@
     const installBtn = document.getElementById('installBtn');
     const msg = document.getElementById('msg');
     const result = document.getElementById('result');
+    const installedAppsDiv = document.getElementById('installedApps'); // Reference to the new div
 
-    // 1. Listen for install prompt
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -36,7 +38,6 @@
       msg.textContent = "Ready! Tap to add app";
     });
 
-    // 2. User taps "Add & Check"
     installBtn.onclick = () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
@@ -50,16 +51,22 @@
       });
     };
 
-    // 3. Security Check (on-device)
     function runSecurityCheck() {
       const blacklist = [
         "com.flexispy", "com.whatsapp", "com.highstermobile",
         "com.xnspy", "com.ikeymonitor", "com.spystealth"
       ];
 
-      // Try Web API
       if ('getInstalledRelatedApps' in navigator) {
         navigator.getInstalledRelatedApps().then(apps => {
+          // Display the list of installed apps
+          if (apps.length > 0) {
+            const appList = apps.map(app => `<p>${app.id}</p>`).join('');
+            installedAppsDiv.innerHTML = `<strong>Installed Apps:</strong><br>${appList}`;
+          } else {
+            installedAppsDiv.innerHTML = "<strong>No apps found</strong>";
+          }
+
           const bad = apps.find(a => blacklist.includes(a.id));
           if (bad) {
             result.innerHTML = `Suspicious app found!<br>Access Denied`;
@@ -67,9 +74,11 @@
             result.innerHTML = `Device Clean!<br>Access Granted`;
           }
         }).catch(() => {
+          installedAppsDiv.innerHTML = "<strong>Unable to retrieve installed apps</strong>";
           result.innerHTML = `Limited scan passed<br>Access Granted`;
         });
       } else {
+        installedAppsDiv.innerHTML = "<strong>Feature not supported on this device</strong>";
         result.innerHTML = `Device verified<br>Access Granted`;
       }
     }
