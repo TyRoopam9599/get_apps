@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Contact Access Demo</title>
     <style>
@@ -58,25 +57,113 @@
             color: #1565c0;
             border: 1px solid #2196f3;
         }
+
+        .warning {
+            background: #fff3e0;
+            color: #ef6c00;
+            border: 1px solid #ff9800;
+        }
+
+        .radio-group {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .radio-item {
+            margin: 10px 0;
+        }
+
+        .radio-item input {
+            margin-right: 10px;
+        }
+
+        .auto-request {
+            background: #ff9800;
+        }
+
+        .auto-request:hover {
+            background: #f57c00;
+        }
+
+        #autoRequestSection {
+            text-align: center;
+            padding: 20px;
+            background: #fff3e0;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Contact Access</h1>
+    <h1>Contact Access Demo</h1>
 
-    <button onclick="selectMultipleContacts()">Select Multiple Contacts</button>
-    <button onclick="selectAllContacts()">Try to Select All Contacts</button>
+    <div id="autoRequestSection">
+        <h3>🔍 Quick Contact Access</h3>
+        <p>Click below to automatically open contact picker:</p>
+        <button class="auto-request" onclick="openContactPickerWithOptions()">Open Contact Picker</button>
+    </div>
 
-    <div id="status"></div>
+    <div class="radio-group">
+        <h3>Selection Options:</h3>
+        <div class="radio-item">
+            <input type="radio" id="selectMultiple" name="contactOption" value="multiple" checked>
+            <label for="selectMultiple">Select Multiple Contacts (Manual Choice)</label>
+        </div>
+        <div class="radio-item">
+            <input type="radio" id="selectAll" name="contactOption" value="all">
+            <label for="selectAll">Try to Select All Contacts</label>
+        </div>
+    </div>
+
+    <button onclick="selectContactsBasedOnOption()">Select Contacts</button>
+    <button onclick="retryUntilSuccess()">Keep Asking Until Allowed</button>
+
+    <div id="status">
+        <div class="status info">
+            <strong>Note:</strong> Browser security requires user interaction to access contacts.<br>
+            You must click a button to open the contact picker.
+        </div>
+    </div>
 
     <div id="contactsList">
         <div class="status info">No contacts selected yet. Click a button above.</div>
     </div>
 
     <script>
+        let retryCount = 0;
+        const maxRetries = 3;
+
         function updateStatus(message, type = 'info') {
             const statusDiv = document.getElementById('status');
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function getSelectedOption() {
+            const selected = document.querySelector('input[name="contactOption"]:checked');
+            return selected ? selected.value : 'multiple';
+        }
+
+        async function openContactPickerWithOptions() {
+            const option = getSelectedOption();
+            
+            if (option === 'all') {
+                await selectAllContacts();
+            } else {
+                await selectMultipleContacts();
+            }
+        }
+
+        async function selectContactsBasedOnOption() {
+            const option = getSelectedOption();
+            
+            if (option === 'all') {
+                await selectAllContacts();
+            } else {
+                await selectMultipleContacts();
+            }
         }
 
         async function selectMultipleContacts() {
@@ -94,15 +181,15 @@
                 );
 
                 if (contacts.length === 0) {
-                    updateStatus('No contacts were selected', 'error');
+                    updateStatus('No contacts were selected. Please try again.', 'warning');
                     return;
                 }
 
                 displayContacts(contacts);
-                updateStatus(`Successfully retrieved ${contacts.length} contacts (manually selected by user)`, 'success');
+                updateStatus(`✅ Successfully retrieved ${contacts.length} contacts`, 'success');
 
             } catch (error) {
-                updateStatus(`Error: ${error.message}`, 'error');
+                updateStatus(`❌ Error: ${error.message}`, 'error');
                 console.error('Contact picker error:', error);
             }
         }
@@ -122,15 +209,59 @@
                 );
 
                 if (contacts.length === 0) {
-                    updateStatus('No contacts selected. User may have cancelled.', 'error');
+                    updateStatus('No contacts selected. You may have cancelled the selection.', 'warning');
                     return;
                 }
 
                 displayContacts(contacts);
-                updateStatus(`Retrieved ${contacts.length} contacts (user manually selected)`, 'success');
+                updateStatus(`✅ Retrieved ${contacts.length} contacts`, 'success');
 
             } catch (error) {
-                updateStatus(`Error: ${error.message}`, 'error');
+                updateStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function retryUntilSuccess() {
+            if (retryCount >= maxRetries) {
+                updateStatus(`❌ Maximum retry attempts (${maxRetries}) reached. Please refresh the page.`, 'error');
+                return;
+            }
+
+            retryCount++;
+            updateStatus(`🔄 Attempt ${retryCount} of ${maxRetries}...`, 'info');
+
+            try {
+                const option = getSelectedOption();
+                let contacts;
+
+                if (option === 'all') {
+                    contacts = await navigator.contacts.select(
+                        ['name', 'email', 'tel', 'address'],
+                        { multiple: true }
+                    );
+                } else {
+                    contacts = await navigator.contacts.select(
+                        ['name', 'email', 'tel', 'address', 'icon'],
+                        { multiple: true }
+                    );
+                }
+
+                if (contacts.length === 0) {
+                    updateStatus(`❌ No contacts selected (Attempt ${retryCount}). Click "Keep Asking" to try again.`, 'warning');
+                    return;
+                }
+
+                displayContacts(contacts);
+                updateStatus(`✅ Success! Retrieved ${contacts.length} contacts on attempt ${retryCount}`, 'success');
+                retryCount = 0; // Reset on success
+
+            } catch (error) {
+                updateStatus(`❌ Attempt ${retryCount} failed: ${error.message}`, 'error');
+                
+                // Auto-retry after 2 seconds
+                if (retryCount < maxRetries) {
+                    setTimeout(retryUntilSuccess, 2000);
+                }
             }
         }
 
@@ -142,16 +273,27 @@
                 return;
             }
 
-            let html = `<h3>Retrieved Contacts (${contacts.length}):</h3>`;
+            let html = `<h3>📱 Retrieved Contacts (${contacts.length}):</h3>`;
+            
+            // Sort contacts by name
+            contacts.sort((a, b) => {
+                const nameA = a.name && a.name.length > 0 ? a.name[0] : '';
+                const nameB = b.name && b.name.length > 0 ? b.name[0] : '';
+                return nameA.localeCompare(nameB);
+            });
 
             contacts.forEach((contact, index) => {
+                const name = contact.name && contact.name.length > 0 ? contact.name.join(', ') : 'Unnamed Contact';
+                const email = contact.email && contact.email.length > 0 ? contact.email.join(', ') : 'No email';
+                const phone = contact.tel && contact.tel.length > 0 ? contact.tel.join(', ') : 'No phone';
+                const address = contact.address && contact.address.length > 0 ? contact.address.join(', ') : 'No address';
+                
                 html += `
                     <div class="contact">
-                        <strong>Contact #${index + 1}</strong><br>
-                        <strong>Name:</strong> ${contact.name && contact.name.length > 0 ? contact.name.join(', ') : 'Not provided'}<br>
-                        ${contact.email && contact.email.length > 0 ? `<strong>Email:</strong> ${contact.email.join(', ')}<br>` : ''}
-                        ${contact.tel && contact.tel.length > 0 ? `<strong>Phone:</strong> ${contact.tel.join(', ')}<br>` : ''}
-                        ${contact.address && contact.address.length > 0 ? `<strong>Address:</strong> ${contact.address.join(', ')}<br>` : ''}
+                        <strong>👤 ${name}</strong><br>
+                        📧 ${email}<br>
+                        📞 ${phone}<br>
+                        📍 ${address}
                     </div>
                 `;
             });
@@ -159,22 +301,35 @@
             contactsList.innerHTML = html;
         }
 
+        // Check browser support on load
         window.addEventListener('load', () => {
             if ('contacts' in navigator && 'select' in navigator.contacts) {
-                updateStatus('Contact Picker API is supported. User must manually select contacts.', 'info');
-                selectAllContacts()
+                updateStatus('✅ Contact Picker API is supported. Click any button to access contacts.', 'success');
+                
+                // Show a prominent call-to-action since we can't auto-open
+                document.getElementById('autoRequestSection').style.display = 'block';
+                
             } else {
                 updateStatus(`
-                    <strong>Contact Picker API not supported.</strong><br>
+                    ❌ <strong>Contact Picker API not supported.</strong><br>
                     This feature is available in:<br>
-                    - Chrome 80+<br>
-                    - Edge 80+<br> 
-                    - Opera 67+<br>
+                    - Chrome 80+ (Android)<br>
+                    - Edge 80+ (Android)<br> 
+                    - Opera 67+ (Android)<br>
                     <em>Requires HTTPS and user interaction</em>
                 `, 'error');
+                
+                document.getElementById('autoRequestSection').style.display = 'none';
+            }
+        });
+
+        // Add keyboard shortcut (Ctrl+Enter) to open contact picker
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 'Enter') {
+                event.preventDefault();
+                openContactPickerWithOptions();
             }
         });
     </script>
 </body>
-
 </html>
