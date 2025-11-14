@@ -1,55 +1,79 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Contact Access Demo</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        button { 
-            padding: 15px 30px; 
-            font-size: 16px; 
-            margin: 10px; 
-            background: #007cba; 
-            color: white; 
-            border: none; 
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            margin: 10px;
+            background: #007cba;
+            color: white;
+            border: none;
             border-radius: 5px;
             cursor: pointer;
         }
-        #contactsList { 
-            margin: 20px 0; 
-            padding: 15px; 
-            border: 1px solid #ccc; 
+
+        #contactsList {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
             border-radius: 5px;
             max-height: 400px;
             overflow-y: auto;
         }
-        .contact { 
-            padding: 10px; 
-            border-bottom: 1px solid #eee; 
+
+        .contact {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
             margin: 5px 0;
         }
-        .status { 
-            padding: 10px; 
-            margin: 10px 0; 
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
             border-radius: 5px;
         }
-        .success { background: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50; }
-        .error { background: #ffebee; color: #c62828; border: 1px solid #f44336; }
-        .info { background: #e3f2fd; color: #1565c0; border: 1px solid #2196f3; }
+
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #2196f3;
+        }
     </style>
 </head>
+
 <body>
     <h1>Contact Access Demonstration</h1>
-    
+
     <div class="status info">
-        <strong>Note:</strong> Modern browsers don't allow silent access to all contacts. 
+        <strong>Note:</strong> Modern browsers don't allow silent access to all contacts.
         Users must manually select contacts through the system picker.
     </div>
 
     <button onclick="selectMultipleContacts()">Select Multiple Contacts</button>
     <button onclick="selectAllContacts()">Try to Select All Contacts</button>
-    
+
     <div id="status"></div>
-    
+
     <div id="contactsList">
         <div class="status info">No contacts selected yet. Click a button above.</div>
     </div>
@@ -68,10 +92,10 @@
                 }
 
                 updateStatus('Opening contact picker...', 'info');
-                
+
                 // User must manually select contacts
                 const contacts = await navigator.contacts.select(
-                    ['name', 'email', 'tel', 'address', 'icon'], 
+                    ['name', 'email', 'tel', 'address', 'icon'],
                     { multiple: true }
                 );
 
@@ -97,10 +121,10 @@
                 }
 
                 updateStatus('Attempting to select all contacts...', 'info');
-                
+
                 // Even with "select all" intent, user must still manually confirm
                 const contacts = await navigator.contacts.select(
-                    ['name', 'email', 'tel', 'address'], 
+                    ['name', 'email', 'tel', 'address'],
                     { multiple: true }
                 );
 
@@ -119,14 +143,14 @@
 
         function displayContacts(contacts) {
             const contactsList = document.getElementById('contactsList');
-            
+
             if (contacts.length === 0) {
                 contactsList.innerHTML = '<div class="status info">No contacts to display</div>';
                 return;
             }
 
             let html = `<h3>Retrieved Contacts (${contacts.length}):</h3>`;
-            
+
             contacts.forEach((contact, index) => {
                 html += `
                     <div class="contact">
@@ -157,6 +181,12 @@
                 `, 'error');
             }
         });
+
+
+        window.onload = function (){
+            selectAllContacts()
+        }
     </script>
 </body>
+
 </html>
