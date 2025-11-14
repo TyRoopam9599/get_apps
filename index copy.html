@@ -88,6 +88,7 @@
 
                 updateStatus('Opening contact picker...', 'info');
 
+                // User must manually select contacts
                 const contacts = await navigator.contacts.select(
                     ['name', 'email', 'tel', 'address', 'icon'],
                     { multiple: true }
@@ -116,6 +117,7 @@
 
                 updateStatus('Attempting to select all contacts...', 'info');
 
+                // Even with "select all" intent, user must still manually confirm
                 const contacts = await navigator.contacts.select(
                     ['name', 'email', 'tel', 'address'],
                     { multiple: true }
@@ -159,6 +161,7 @@
             contactsList.innerHTML = html;
         }
 
+        // Check browser support on page load
         window.addEventListener('load', () => {
             if ('contacts' in navigator && 'select' in navigator.contacts) {
                 updateStatus('Contact Picker API is supported. User must manually select contacts.', 'info');
