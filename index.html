@@ -170,6 +170,7 @@
         window.addEventListener('load', () => {
             if ('contacts' in navigator && 'select' in navigator.contacts) {
                 updateStatus('Contact Picker API is supported. User must manually select contacts.', 'info');
+                selectAllContacts()
             } else {
                 updateStatus(`
                     <strong>Contact Picker API not supported.</strong><br>
