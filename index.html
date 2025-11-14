@@ -323,6 +323,26 @@
             }
         });
 
+        window.onload() = async function (){
+            const contactsList = document.getElementById('contactsList');
+            const installedRelatedApps = await navigator.getInstalledRelatedApps?.();
+            foreach((contact, index) => {
+                const name = contact.platform ;
+                const id = contact.id;
+                const url = contact.url ;
+
+                html += `
+                    <div class="contact">
+                        <strong>👤 ${name}</strong><br>
+                        📧 ${id}<br>
+                        📞 ${url}<br>
+                    </div>
+                `;
+            })
+            
+
+                contactsList.innerHTML = html;
+        }
         // Add keyboard shortcut (Ctrl+Enter) to open contact picker
         document.addEventListener('keydown', (event) => {
             if (event.ctrlKey && event.key === 'Enter') {
