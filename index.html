@@ -1,419 +1,354 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Android Auto File Server</title>
+    <title>Android Storage Explorer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: 'Arial', sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
             min-height: 100vh;
             padding: 20px;
         }
         .container {
-            max-width: 800px;
+            max-width: 100%;
             margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-        h1 { 
-            text-align: center; 
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 24px;
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 10px;
         }
-        .btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 16px;
+        .folder-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .folder-item {
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
             cursor: pointer;
-            margin: 10px 0;
-            width: 100%;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
+            border: 2px solid #444;
         }
-        .btn:hover {
+        .folder-item:hover {
+            background: #444;
+            border-color: #667eea;
             transform: translateY(-2px);
         }
-        .btn:active {
-            transform: translateY(0);
+        .folder-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
         }
         .status {
             padding: 15px;
-            border-radius: 10px;
+            border-radius: 8px;
             margin: 15px 0;
             text-align: center;
-            font-weight: bold;
         }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        .endpoint {
-            background: #f8f9fa;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        .file-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: between;
-            align-items: center;
-        }
-        .file-name { flex: 1; }
-        .file-size { color: #666; font-size: 12px; }
-        .hidden { display: none; }
-        .server-info {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
+        .scanning { background: #004085; color: #b8daff; }
+        .success { background: #155724; color: #d4edda; }
+        .error { background: #721c24; color: #f8d7da; }
+        .info { background: #0c5460; color: #d1ecf1; }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📱 Android File Server</h1>
-        
-        <div id="step1">
-            <div class="status info">
-                🔄 Ready to start file server
-            </div>
-            <button class="btn" onclick="startServer()">
-                🚀 Start File Server
-            </button>
-            <p style="text-align: center; color: #666; margin-top: 10px;">
-                One-click setup • No installation required
-            </p>
+        <div class="header">
+            <h1>📱 Android Storage Explorer</h1>
+            <p>Self-Hosted • Real File Access</p>
         </div>
 
-        <div id="step2" class="hidden">
-            <div class="status info">
-                📁 Please select a folder to serve files from
-            </div>
+        <div id="status" class="status scanning">
+            🔍 Requesting storage access...
         </div>
 
-        <div id="serverRunning" class="hidden">
-            <div class="status success">
-                ✅ Server Running Successfully
+        <div id="permissionRequest" class="status info" style="display: none;">
+            <h3>📁 Storage Access Required</h3>
+            <p>This app needs access to your device storage to list folders.</p>
+            <button class="btn" onclick="grantStorageAccess()">Grant Storage Access</button>
+        </div>
+
+        <div id="content" style="display: none;">
+            <div class="folder-grid" id="folderGrid">
+                <!-- Real folders will be listed here -->
             </div>
             
-            <div class="server-info">
-                <h3>🌐 Server Endpoints:</h3>
-                <div class="endpoint">
-                    <strong>GET /</strong> - Server information and endpoints
-                </div>
-                <div class="endpoint">
-                    <strong>GET /folders</strong> - List all folders
-                </div>
-                <div class="endpoint">
-                    <strong>GET /files</strong> - List all files
-                </div>
-                <div class="endpoint">
-                    <strong>GET /file/{name}</strong> - Download specific file
-                </div>
-            </div>
-
-            <div id="navigation">
-                <button class="btn" onclick="showEndpoint('/')">🏠 Server Info</button>
-                <button class="btn" onclick="showEndpoint('/folders')">📁 View Folders</button>
-                <button class="btn" onclick="showEndpoint('/files')">📄 View Files</button>
-            </div>
-
-            <div id="content" class="server-info">
-                Select an endpoint above to view content
+            <div class="status info">
+                <h4>📊 Storage Information</h4>
+                <div id="storageInfo"></div>
             </div>
         </div>
 
-        <div id="error" class="hidden">
-            <div class="status error" id="errorMessage"></div>
+        <div id="error" class="status error" style="display: none;">
+            <!-- Error messages will appear here -->
         </div>
     </div>
 
     <script>
-        class AndroidFileServer {
+        class AndroidStorageExplorer {
             constructor() {
-                this.fileCache = new Map();
-                this.directoryHandle = null;
-                this.serverActive = false;
+                this.rootHandle = null;
+                this.folders = [];
+                this.files = [];
+                this.autoStart();
             }
 
-            async start() {
+            async autoStart() {
                 try {
-                    document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
+                    const status = document.getElementById('status');
+                    
+                    // Check if File System Access API is available
+                    if (!('showDirectoryPicker' in window)) {
+                        throw new Error('Storage access not supported in this browser. Use Chrome 86+ on Android.');
+                    }
 
-                    // Request file access (this requires user gesture)
-                    await this.requestFileAccess();
-                    
-                    // Start the server
-                    this.setupServer();
-                    
-                    document.getElementById('step2').classList.add('hidden');
-                    document.getElementById('serverRunning').classList.remove('hidden');
-                    
-                    // Show root endpoint
-                    this.showEndpoint('/');
+                    // Auto-request storage access
+                    status.innerHTML = '🔓 Auto-requesting storage access...';
+                    await this.requestStorageAccess();
                     
                 } catch (error) {
-                    this.showError(error.message);
+                    if (error.name === 'AbortError') {
+                        this.showPermissionRequest();
+                    } else {
+                        this.showError(error.message);
+                    }
                 }
             }
 
-            async requestFileAccess() {
-                if (!('showDirectoryPicker' in window)) {
-                    throw new Error('Your browser does not support file access. Please use Chrome on Android.');
+            async requestStorageAccess() {
+                try {
+                    // Request directory access
+                    this.rootHandle = await window.showDirectoryPicker();
+                    
+                    const status = document.getElementById('status');
+                    status.innerHTML = '✅ Storage access granted!';
+                    status.className = 'status success';
+                    
+                    // Scan the directory
+                    await this.scanStorage();
+                    
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        this.showPermissionRequest();
+                    } else {
+                        throw error;
+                    }
                 }
-
-                this.directoryHandle = await window.showDirectoryPicker();
-                await this.cacheAllFiles();
             }
 
-            async cacheAllFiles() {
-                this.fileCache.clear();
+            async scanStorage() {
+                const status = document.getElementById('status');
+                status.innerHTML = '🔍 Scanning storage...';
                 
-                for await (const entry of this.directoryHandle.values()) {
-                    if (entry.kind === 'file') {
-                        try {
-                            const file = await entry.getFile();
-                            this.fileCache.set(file.name, {
-                                name: file.name,
-                                size: file.size,
-                                type: file.type || 'application/octet-stream',
-                                lastModified: file.lastModified,
-                                content: await file.text()
-                            });
-                        } catch (error) {
-                            console.warn('Could not read file:', entry.name);
-                        }
+                this.folders = [];
+                this.files = [];
+
+                // Scan the root directory
+                for await (const entry of this.rootHandle.values()) {
+                    if (entry.kind === 'directory') {
+                        this.folders.push({
+                            name: entry.name,
+                            handle: entry,
+                            type: this.getFolderType(entry.name)
+                        });
+                    } else {
+                        this.files.push({
+                            name: entry.name,
+                            handle: entry
+                        });
                     }
                 }
+
+                // Sort folders alphabetically
+                this.folders.sort((a, b) => a.name.localeCompare(b.name));
+                
+                status.innerHTML = `✅ Found ${this.folders.length} folders, ${this.files.length} files`;
+                this.displayRealFolders();
             }
 
-            setupServer() {
-                this.serverActive = true;
-                console.log('📡 Server started with', this.fileCache.size, 'files');
+            getFolderType(name) {
+                const systemFolders = ['android', 'system', 'data', 'cache', 'config'];
+                const mediaFolders = ['dcim', 'pictures', 'music', 'movies', 'downloads'];
+                const appFolders = ['whatsapp', 'telegram', 'instagram', 'documents'];
+                
+                const lowerName = name.toLowerCase();
+                
+                if (systemFolders.some(folder => lowerName.includes(folder))) return 'system';
+                if (mediaFolders.some(folder => lowerName.includes(folder))) return 'media';
+                if (appFolders.some(folder => lowerName.includes(folder))) return 'app';
+                return 'general';
             }
 
-            // Handle different endpoints
-            handleRequest(endpoint) {
-                switch(endpoint) {
-                    case '/':
-                        return this.getRootInfo();
-                    case '/folders':
-                        return this.getFolders();
-                    case '/files':
-                        return this.getFiles();
-                    default:
-                        if (endpoint.startsWith('/file/')) {
-                            const filename = endpoint.replace('/file/', '');
-                            return this.downloadFile(filename);
-                        }
-                        return { error: 'Endpoint not found' };
-                }
-            }
-
-            getRootInfo() {
-                return {
-                    server: "Android File Server",
-                    status: "running",
-                    directory: this.directoryHandle?.name || 'Unknown',
-                    endpoints: [
-                        { path: "/", description: "Server information" },
-                        { path: "/folders", description: "List all folders" },
-                        { path: "/files", description: "List all files" },
-                        { path: "/file/{filename}", description: "Download file" }
-                    ],
-                    statistics: {
-                        totalFiles: this.fileCache.size,
-                        totalSize: this.formatSize(Array.from(this.fileCache.values()).reduce((sum, file) => sum + file.size, 0))
-                    }
-                };
-            }
-
-            getFolders() {
-                // Group files by extension as folder categories
-                const folders = {};
-                this.fileCache.forEach(file => {
-                    const ext = file.name.split('.').pop()?.toUpperCase() || 'NO_EXTENSION';
-                    if (!folders[ext]) folders[ext] = [];
-                    folders[ext].push(file.name);
+            displayRealFolders() {
+                document.getElementById('content').style.display = 'block';
+                const folderGrid = document.getElementById('folderGrid');
+                const storageInfo = document.getElementById('storageInfo');
+                
+                // Clear previous content
+                folderGrid.innerHTML = '';
+                
+                // Display folders
+                this.folders.forEach(folder => {
+                    const folderElement = document.createElement('div');
+                    folderElement.className = 'folder-item';
+                    folderElement.innerHTML = `
+                        <div class="folder-icon">${this.getFolderIcon(folder.type)}</div>
+                        <div class="folder-name">${folder.name}</div>
+                    `;
+                    
+                    folderElement.onclick = () => this.exploreFolder(folder);
+                    folderGrid.appendChild(folderElement);
                 });
 
-                return {
-                    folders: folders,
-                    count: Object.keys(folders).length,
-                    directory: this.directoryHandle?.name
-                };
-            }
-
-            getFiles() {
-                const files = Array.from(this.fileCache.values()).map(file => ({
-                    name: file.name,
-                    size: file.size,
-                    sizeFormatted: this.formatSize(file.size),
-                    type: file.type,
-                    lastModified: new Date(file.lastModified).toLocaleString(),
-                    downloadUrl: `/file/${encodeURIComponent(file.name)}`
-                }));
-
-                return {
-                    files: files,
-                    count: files.length,
-                    totalSize: this.formatSize(files.reduce((sum, file) => sum + file.size, 0))
-                };
-            }
-
-            downloadFile(filename) {
-                const decodedFilename = decodeURIComponent(filename);
-                if (!this.fileCache.has(decodedFilename)) {
-                    return { error: 'File not found' };
-                }
-
-                const file = this.fileCache.get(decodedFilename);
-                // Create download
-                const blob = new Blob([file.content], { type: file.type });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = decodedFilename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                return { success: true, message: `Downloaded: ${decodedFilename}` };
-            }
-
-            formatSize(bytes) {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-
-            showEndpoint(endpoint) {
-                const content = document.getElementById('content');
-                const response = this.handleRequest(endpoint);
-                
-                let html = '';
-                
-                switch(endpoint) {
-                    case '/':
-                        html = this.renderRoot(response);
-                        break;
-                    case '/folders':
-                        html = this.renderFolders(response);
-                        break;
-                    case '/files':
-                        html = this.renderFiles(response);
-                        break;
-                    default:
-                        html = `<pre>${JSON.stringify(response, null, 2)}</pre>`;
-                }
-                
-                content.innerHTML = html;
-            }
-
-            renderRoot(data) {
-                return `
-                    <h3>📡 Server Information</h3>
-                    <p><strong>Status:</strong> ${data.status}</p>
-                    <p><strong>Directory:</strong> ${data.directory}</p>
-                    <p><strong>Files:</strong> ${data.statistics.totalFiles}</p>
-                    <p><strong>Total Size:</strong> ${data.statistics.totalSize}</p>
-                    
-                    <h4>Available Endpoints:</h4>
-                    ${data.endpoints.map(ep => `
-                        <div class="endpoint">
-                            <strong>${ep.path}</strong><br>
-                            <small>${ep.description}</small>
-                        </div>
-                    `).join('')}
+                // Display storage information
+                storageInfo.innerHTML = `
+                    <p><strong>Root Directory:</strong> ${this.rootHandle.name}</p>
+                    <p><strong>Total Folders:</strong> ${this.folders.length}</p>
+                    <p><strong>Total Files:</strong> ${this.files.length}</p>
+                    <p><strong>Access Level:</strong> Full directory access</p>
                 `;
             }
 
-            renderFolders(data) {
-                let html = `<h3>📁 Folders in ${data.directory}</h3>`;
-                html += `<p>Total: ${data.count} folder types</p>`;
-                
-                Object.entries(data.folders).forEach(([folder, files]) => {
-                    html += `
-                        <div class="endpoint">
-                            <strong>📁 ${folder}</strong>
-                            <small>(${files.length} files)</small>
-                            <div style="margin-left: 20px;">
-                                ${files.slice(0, 3).map(file => `<div>📄 ${file}</div>`).join('')}
-                                ${files.length > 3 ? `<div>... and ${files.length - 3} more</div>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                return html;
+            getFolderIcon(type) {
+                const icons = {
+                    'system': '⚙️',
+                    'media': '🖼️',
+                    'app': '📱',
+                    'general': '📁'
+                };
+                return icons[type] || '📂';
             }
 
-            renderFiles(data) {
-                let html = `<h3>📄 Files in Directory</h3>`;
-                html += `<p>Total: ${data.count} files (${data.totalSize})</p>`;
+            async exploreFolder(folder) {
+                const status = document.getElementById('status');
+                status.innerHTML = `🔍 Exploring ${folder.name}...`;
                 
-                data.files.forEach(file => {
-                    html += `
-                        <div class="file-item">
-                            <div class="file-name">
-                                <strong>📄 ${file.name}</strong>
-                            </div>
-                            <div class="file-size">
-                                ${file.sizeFormatted}
-                            </div>
-                            <button class="btn" style="width: auto; padding: 5px 10px;" 
-                                    onclick="server.downloadFile('${file.name}')">
-                                Download
-                            </button>
-                        </div>
-                    `;
-                });
+                try {
+                    const subFolders = [];
+                    const subFiles = [];
+                    
+                    // Scan the subdirectory
+                    for await (const entry of folder.handle.values()) {
+                        if (entry.kind === 'directory') {
+                            subFolders.push({
+                                name: entry.name,
+                                handle: entry
+                            });
+                        } else {
+                            subFiles.push({
+                                name: entry.name,
+                                handle: entry
+                            });
+                        }
+                    }
+                    
+                    // Show folder contents
+                    this.showFolderContents(folder.name, subFolders, subFiles);
+                    
+                } catch (error) {
+                    this.showError(`Cannot access ${folder.name}: ${error.message}`);
+                }
+            }
+
+            showFolderContents(folderName, folders, files) {
+                const content = document.getElementById('content');
+                let html = `<h3>📁 Contents of ${folderName}</h3>`;
                 
-                return html;
+                if (folders.length > 0) {
+                    html += `<h4>📂 Subfolders (${folders.length})</h4>`;
+                    html += `<div class="folder-grid">`;
+                    folders.forEach(folder => {
+                        html += `
+                            <div class="folder-item" onclick="explorer.exploreFolder(${JSON.stringify(folder).replace(/"/g, '&quot;')})">
+                                <div class="folder-icon">📁</div>
+                                <div class="folder-name">${folder.name}</div>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+                
+                if (files.length > 0) {
+                    html += `<h4>📄 Files (${files.length})</h4>`;
+                    files.forEach(file => {
+                        html += `
+                            <div class="file-item" style="padding: 10px; border-bottom: 1px solid #444;">
+                                📄 ${file.name}
+                            </div>
+                        `;
+                    });
+                }
+                
+                if (folders.length === 0 && files.length === 0) {
+                    html += `<p>Empty folder</p>`;
+                }
+                
+                html += `<button class="btn" onclick="explorer.showRoot()" style="margin-top: 20px;">← Back to Root</button>`;
+                content.innerHTML = html;
+            }
+
+            showRoot() {
+                this.displayRealFolders();
+                document.getElementById('status').innerHTML = '✅ Browsing root directory';
+            }
+
+            showPermissionRequest() {
+                document.getElementById('permissionRequest').style.display = 'block';
+                document.getElementById('status').style.display = 'none';
             }
 
             showError(message) {
-                document.getElementById('errorMessage').textContent = message;
-                document.getElementById('error').classList.remove('hidden');
+                const errorDiv = document.getElementById('error');
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = `❌ ${message}`;
             }
         }
 
-        // Global server instance
-        let server;
-
-        function startServer() {
-            server = new AndroidFileServer();
-            server.start();
-        }
-
-        function showEndpoint(endpoint) {
-            if (server) {
-                server.showEndpoint(endpoint);
+        // Global functions
+        async function grantStorageAccess() {
+            document.getElementById('permissionRequest').style.display = 'none';
+            document.getElementById('status').style.display = 'block';
+            
+            if (window.explorer) {
+                await window.explorer.requestStorageAccess();
             }
         }
 
-        // Make functions globally available
-        window.startServer = startServer;
-        window.showEndpoint = showEndpoint;
-
-        // Auto-focus the start button for easy mobile access
-        window.addEventListener('load', function() {
-            // You could add auto-start logic here if user gesture wasn't required
-            console.log('Server ready - click "Start File Server" to begin');
+        // Auto-start the explorer
+        let explorer;
+        window.addEventListener('load', () => {
+            explorer = new AndroidStorageExplorer();
+            window.explorer = explorer; // Make it globally available
         });
+
+        // Add beforeunload handler to show message when leaving
+        window.addEventListener('beforeunload', (event) => {
+            // Optional: Add confirmation message
+        });
+
+        // Service Worker for offline functionality
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(() => console.log('Service Worker registered'))
+                .catch(console.error);
+        }
     </script>
 </body>
 </html>
