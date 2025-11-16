@@ -1,76 +1,120 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Browser HTTP Server</title>
+    <title>Dynamic Browser HTTP Server</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .server-status { padding: 15px; margin: 10px 0; border-radius: 5px; }
         .running { background: #e8f5e8; color: #2e7d32; }
         .stopped { background: #ffebee; color: #c62828; }
         .file-list { border: 1px solid #ccc; padding: 15px; margin: 15px 0; max-height: 400px; overflow-y: auto; }
-        .file-item { padding: 8px; border-bottom: 1px solid #eee; }
+        .file-item { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .file-item:hover { background: #f5f5f5; }
+        .endpoint { background: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; }
     </style>
 </head>
 <body>
-    <h1>🌐 Browser HTTP Server</h1>
+    <h1>🌐 Dynamic Browser HTTP Server</h1>
     
     <div id="status" class="server-status stopped">
         Server Status: Stopped
     </div>
 
     <button onclick="startServer()">🚀 Start HTTP Server</button>
-    <button onclick="stopServer()">🛑 Stop Server</button>
-    <button onclick="browseFiles()">📁 Access Storage</button>
+    <button onclick="browseFiles()">📁 Select Root Folder</button>
+    <button onclick="testEndpoints()">🔍 Test Server Endpoints</button>
 
     <div id="fileList" class="file-list">
-        Select "Access Storage" to browse files
+        Select "Select Root Folder" to choose a directory for the server
     </div>
 
-    <div id="serverUrls" style="display: none; margin: 15px 0; padding: 15px; background: #f5f5f5;">
-        <h3>Server Endpoints:</h3>
-        <div id="endpoints"></div>
+    <div id="serverUrls" style="display: none; margin: 15px 0;">
+        <h3>🌐 Server Endpoints:</h3>
+        <div class="endpoint">
+            <strong>GET /files</strong> - List all files in selected directory<br>
+            <code id="filesUrl">http://localhost:8080/files</code>
+        </div>
+        <div class="endpoint">
+            <strong>GET /file/*</strong> - Download specific file<br>
+            <code>http://localhost:8080/file/filename.txt</code>
+        </div>
+        <div class="endpoint">
+            <strong>GET /folders</strong> - List all folders<br>
+            <code>http://localhost:8080/folders</code>
+        </div>
     </div>
 
     <script>
         let serverActive = false;
-        let fileSystemHandle = null;
+        let selectedDirectoryHandle = null;
+        let fileCache = new Map(); // Cache for file contents
 
-        // Service Worker based "server" simulation
+        // Register Service Worker
         async function startServer() {
             const status = document.getElementById('status');
             
             try {
-                // Register Service Worker
-                if ('serviceWorker' in navigator) {
-                    const registration = await navigator.serviceWorker.register('./sw.js');
-                    console.log('Service Worker registered');
+                if (!selectedDirectoryHandle) {
+                    throw new Error('Please select a root folder first');
                 }
 
-                status.className = 'server-status running';
-                status.innerHTML = 'Server Status: Running on virtual port 8080';
-                serverActive = true;
-
-                // Show virtual endpoints
-                document.getElementById('serverUrls').style.display = 'block';
-                document.getElementById('endpoints').innerHTML = `
-                    <div>📡 <strong>Virtual Endpoints:</strong></div>
-                    <div>• GET /files - List files</div>
-                    <div>• GET /download/{filename} - Download file</div>
-                    <div>• POST /upload - Upload file</div>
-                    <div><em>Note: These are virtual endpoints within browser</em></div>
-                `;
+                // Register Service Worker
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    
+                    // Wait for service worker to be ready
+                    await navigator.serviceWorker.ready;
+                    
+                    // Send the directory handle to service worker
+                    if (registration.active) {
+                        // Cache all files in the selected directory
+                        await cacheAllFiles(selectedDirectoryHandle);
+                        
+                        status.className = 'server-status running';
+                        status.innerHTML = '✅ Server Status: Running - Files are cached and ready to serve';
+                        serverActive = true;
+                        
+                        document.getElementById('serverUrls').style.display = 'block';
+                    }
+                } else {
+                    throw new Error('Service Workers not supported');
+                }
 
             } catch (error) {
                 status.innerHTML = `Server Error: ${error.message}`;
             }
         }
 
-        function stopServer() {
-            const status = document.getElementById('status');
-            status.className = 'server-status stopped';
-            status.innerHTML = 'Server Status: Stopped';
-            serverActive = false;
-            document.getElementById('serverUrls').style.display = 'none';
+        // Cache all files for serving
+        async function cacheAllFiles(directoryHandle) {
+            fileCache.clear();
+            console.log('Caching files from directory...');
+            
+            for await (const entry of directoryHandle.values()) {
+                if (entry.kind === 'file') {
+                    try {
+                        const file = await entry.getFile();
+                        fileCache.set(file.name, {
+                            name: file.name,
+                            size: file.size,
+                            type: file.type,
+                            lastModified: file.lastModified,
+                            content: await file.text() // Read file content
+                        });
+                        console.log(`Cached: ${file.name}`);
+                    } catch (error) {
+                        console.warn(`Could not cache ${entry.name}:`, error);
+                    }
+                }
+            }
+            
+            // Send cache to service worker
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'FILE_CACHE_UPDATE',
+                    files: Array.from(fileCache.entries())
+                });
+            }
         }
 
         async function browseFiles() {
@@ -78,27 +122,29 @@
             
             try {
                 if (!('showDirectoryPicker' in window)) {
-                    throw new Error('File System Access API not supported');
+                    throw new Error('File System Access API not supported in this browser');
                 }
 
-                fileList.innerHTML = '🔄 Opening file picker...';
+                fileList.innerHTML = '🔄 Selecting directory for server...';
                 
-                // Request directory access
-                fileSystemHandle = await window.showDirectoryPicker();
+                selectedDirectoryHandle = await window.showDirectoryPicker();
+                const directoryName = selectedDirectoryHandle.name;
+                
+                fileList.innerHTML = `<div class="success">✅ Server root set to: <strong>${directoryName}</strong></div>`;
                 
                 // List directory contents
-                await listDirectory(fileSystemHandle, fileList);
+                await listDirectoryContents(selectedDirectoryHandle, fileList);
                 
             } catch (error) {
                 if (error.name === 'AbortError') {
-                    fileList.innerHTML = 'File selection cancelled';
+                    fileList.innerHTML = 'Directory selection cancelled';
                 } else {
-                    fileList.innerHTML = `Error: ${error.message}`;
+                    fileList.innerHTML = `<div class="error">Error: ${error.message}</div>`;
                 }
             }
         }
 
-        async function listDirectory(directoryHandle, fileListElement) {
+        async function listDirectoryContents(directoryHandle, fileListElement) {
             let folders = [];
             let files = [];
 
@@ -110,68 +156,65 @@
                 }
             }
 
-            let html = `<h3>📁 ${directoryHandle.name}</h3>`;
+            let html = `<h3>📁 Server Root: ${directoryHandle.name}</h3>`;
+            html += `<div>Total: ${folders.length} folders, ${files.length} files</div><hr>`;
             
             if (folders.length > 0) {
                 html += `<h4>📂 Folders (${folders.length})</h4>`;
                 folders.forEach(folder => {
-                    html += `<div class="file-item" onclick="openFolder('${folder.name}')">
+                    html += `<div class="file-item">
                         📁 ${folder.name}
                     </div>`;
                 });
             }
 
             if (files.length > 0) {
-                html += `<h4>📄 Files (${files.length})</h4>`;
-                for (const fileHandle of files) {
-                    const file = await fileHandle.getFile();
-                    html += `<div class="file-item" onclick="downloadFile('${file.name}', '${file.type}', ${file.size})">
-                        📄 ${file.name} (${formatFileSize(file.size)})
+                html += `<h4>📄 Files (${files.length}) - Available via HTTP</h4>`;
+                files.forEach(file => {
+                    html += `<div class="file-item">
+                        📄 ${file.name}
                     </div>`;
-                }
+                });
             }
 
-            if (folders.length === 0 && files.length === 0) {
-                html += '<div>Empty directory</div>';
+            fileListElement.innerHTML += html;
+        }
+
+        async function testEndpoints() {
+            if (!serverActive) {
+                alert('Please start the server first');
+                return;
             }
 
-            fileListElement.innerHTML = html;
+            try {
+                // Test the /files endpoint
+                const response = await fetch('/files');
+                const data = await response.json();
+                
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML += `
+                    <hr><h3>🔍 Server Response Test:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Endpoint test failed:', error);
+            }
         }
 
-        function openFolder(folderName) {
-            alert(`Folder: ${folderName}\nIn a real file system, this would navigate into the folder.`);
-        }
-
-        function downloadFile(filename, fileType, size) {
-            // Create a virtual file download
-            const content = `This is simulated content of ${filename}\nSize: ${formatFileSize(size)}\nType: ${fileType}`;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-
-        // Make functions global for onclick handlers
-        window.openFolder = openFolder;
-        window.downloadFile = downloadFile;
-
-        // Auto-start server on page load
-        window.addEventListener('load', () => {
-            setTimeout(startServer, 1000);
+        // Listen for messages from service worker
+        navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data.type === 'CACHE_READY') {
+                console.log('Service Worker cache is ready');
+            }
         });
+
+        // Initialize
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(() => {
+                console.log('Service Worker is ready');
+            });
+        }
     </script>
 </body>
 </html>
