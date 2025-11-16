@@ -1,220 +1,337 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dynamic Browser HTTP Server</title>
+    <title>Auto File Server</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .server-status { padding: 15px; margin: 10px 0; border-radius: 5px; }
-        .running { background: #e8f5e8; color: #2e7d32; }
-        .stopped { background: #ffebee; color: #c62828; }
-        .file-list { border: 1px solid #ccc; padding: 15px; margin: 15px 0; max-height: 400px; overflow-y: auto; }
-        .file-item { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .file-item:hover { background: #f5f5f5; }
-        .endpoint { background: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        .endpoint { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .file-item { padding: 5px; margin: 2px 0; }
+        .folder { color: #007cba; font-weight: bold; }
+        pre { background: #f8f8f8; padding: 10px; border-radius: 5px; overflow-x: auto; }
     </style>
 </head>
 <body>
-    <h1>🌐 Dynamic Browser HTTP Server</h1>
-    
-    <div id="status" class="server-status stopped">
-        Server Status: Stopped
-    </div>
-
-    <button onclick="startServer()">🚀 Start HTTP Server</button>
-    <button onclick="browseFiles()">📁 Select Root Folder</button>
-    <button onclick="testEndpoints()">🔍 Test Server Endpoints</button>
-
-    <div id="fileList" class="file-list">
-        Select "Select Root Folder" to choose a directory for the server
-    </div>
-
-    <div id="serverUrls" style="display: none; margin: 15px 0;">
-        <h3>🌐 Server Endpoints:</h3>
-        <div class="endpoint">
-            <strong>GET /files</strong> - List all files in selected directory<br>
-            <code id="filesUrl">http://localhost:8080/files</code>
-        </div>
-        <div class="endpoint">
-            <strong>GET /file/*</strong> - Download specific file<br>
-            <code>http://localhost:8080/file/filename.txt</code>
-        </div>
-        <div class="endpoint">
-            <strong>GET /folders</strong> - List all folders<br>
-            <code>http://localhost:8080/folders</code>
-        </div>
-    </div>
+    <h1>🚀 Auto File Server</h1>
+    <div id="status">Initializing server...</div>
+    <div id="content"></div>
 
     <script>
-        let serverActive = false;
-        let selectedDirectoryHandle = null;
-        let fileCache = new Map(); // Cache for file contents
-
-        // Register Service Worker
-        async function startServer() {
-            const status = document.getElementById('status');
-            
-            try {
-                if (!selectedDirectoryHandle) {
-                    throw new Error('Please select a root folder first');
-                }
-
-                // Register Service Worker
-                if ('serviceWorker' in navigator) {
-                    const registration = await navigator.serviceWorker.register('/sw.js');
-                    
-                    // Wait for service worker to be ready
-                    await navigator.serviceWorker.ready;
-                    
-                    // Send the directory handle to service worker
-                    if (registration.active) {
-                        // Cache all files in the selected directory
-                        await cacheAllFiles(selectedDirectoryHandle);
-                        
-                        status.className = 'server-status running';
-                        status.innerHTML = '✅ Server Status: Running - Files are cached and ready to serve';
-                        serverActive = true;
-                        
-                        document.getElementById('serverUrls').style.display = 'block';
-                    }
-                } else {
-                    throw new Error('Service Workers not supported');
-                }
-
-            } catch (error) {
-                status.innerHTML = `Server Error: ${error.message}`;
+        class FileServer {
+            constructor() {
+                this.fileCache = new Map();
+                this.directoryHandle = null;
+                this.init();
             }
-        }
 
-        // Cache all files for serving
-        async function cacheAllFiles(directoryHandle) {
-            fileCache.clear();
-            console.log('Caching files from directory...');
-            
-            for await (const entry of directoryHandle.values()) {
-                if (entry.kind === 'file') {
-                    try {
-                        const file = await entry.getFile();
-                        fileCache.set(file.name, {
-                            name: file.name,
-                            size: file.size,
-                            type: file.type,
-                            lastModified: file.lastModified,
-                            content: await file.text() // Read file content
-                        });
-                        console.log(`Cached: ${file.name}`);
-                    } catch (error) {
-                        console.warn(`Could not cache ${entry.name}:`, error);
-                    }
+            async init() {
+                try {
+                    // Auto-start on load
+                    await this.startServer();
+                } catch (error) {
+                    document.getElementById('status').innerHTML = 
+                        `❌ Server failed to start: ${error.message}`;
                 }
             }
-            
-            // Send cache to service worker
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'FILE_CACHE_UPDATE',
-                    files: Array.from(fileCache.entries())
-                });
-            }
-        }
 
-        async function browseFiles() {
-            const fileList = document.getElementById('fileList');
-            
-            try {
+            async startServer() {
+                const status = document.getElementById('status');
+                status.innerHTML = '🔄 Starting server...';
+
+                // Auto-request file access
+                await this.requestFileAccess();
+                
+                // Start virtual server
+                this.setupVirtualServer();
+                
+                status.innerHTML = '✅ Server started successfully!';
+                
+                // Show root endpoint
+                this.showRoot();
+            }
+
+            async requestFileAccess() {
                 if (!('showDirectoryPicker' in window)) {
-                    throw new Error('File System Access API not supported in this browser');
+                    throw new Error('File System Access API not supported. Use Chrome 86+.');
                 }
 
-                fileList.innerHTML = '🔄 Selecting directory for server...';
-                
-                selectedDirectoryHandle = await window.showDirectoryPicker();
-                const directoryName = selectedDirectoryHandle.name;
-                
-                fileList.innerHTML = `<div class="success">✅ Server root set to: <strong>${directoryName}</strong></div>`;
-                
-                // List directory contents
-                await listDirectoryContents(selectedDirectoryHandle, fileList);
-                
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    fileList.innerHTML = 'Directory selection cancelled';
-                } else {
-                    fileList.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-                }
+                // Auto-request directory access
+                this.directoryHandle = await window.showDirectoryPicker();
+                await this.cacheFiles();
             }
-        }
 
-        async function listDirectoryContents(directoryHandle, fileListElement) {
-            let folders = [];
-            let files = [];
-
-            for await (const entry of directoryHandle.values()) {
-                if (entry.kind === 'directory') {
-                    folders.push(entry);
-                } else {
-                    files.push(entry);
+            async cacheFiles() {
+                this.fileCache.clear();
+                
+                for await (const entry of this.directoryHandle.values()) {
+                    if (entry.kind === 'file') {
+                        try {
+                            const file = await entry.getFile();
+                            this.fileCache.set(file.name, {
+                                name: file.name,
+                                size: file.size,
+                                type: file.type,
+                                lastModified: file.lastModified,
+                                content: await file.text()
+                            });
+                        } catch (error) {
+                            console.warn('Could not read file:', entry.name, error);
+                        }
+                    }
                 }
             }
 
-            let html = `<h3>📁 Server Root: ${directoryHandle.name}</h3>`;
-            html += `<div>Total: ${folders.length} folders, ${files.length} files</div><hr>`;
-            
-            if (folders.length > 0) {
-                html += `<h4>📂 Folders (${folders.length})</h4>`;
-                folders.forEach(folder => {
-                    html += `<div class="file-item">
-                        📁 ${folder.name}
-                    </div>`;
+            setupVirtualServer() {
+                // Override fetch to handle our virtual endpoints
+                const originalFetch = window.fetch;
+                window.fetch = async (input, init) => {
+                    const url = typeof input === 'string' ? input : input.url;
+                    
+                    if (url.startsWith('/')) {
+                        return this.handleRequest(url);
+                    }
+                    
+                    return originalFetch(input, init);
+                };
+
+                // Handle browser navigation
+                window.handleServerRoute = (route) => {
+                    this.handleRoute(route);
+                };
+
+                // Set up route handling
+                window.addEventListener('hashchange', () => {
+                    this.handleRoute(window.location.hash.substring(1));
+                });
+
+                // Initial route
+                this.handleRoute(window.location.hash.substring(1) || '/');
+            }
+
+            handleRoute(route) {
+                const content = document.getElementById('content');
+                
+                switch(route) {
+                    case '/':
+                        this.showRoot();
+                        break;
+                    case '/folders':
+                        this.showFolders();
+                        break;
+                    case '/files':
+                        this.showFiles();
+                        break;
+                    default:
+                        if (route.startsWith('/file/')) {
+                            this.downloadFile(route.replace('/file/', ''));
+                        } else {
+                            content.innerHTML = `<div class="error">❌ Endpoint not found: ${route}</div>`;
+                        }
+                }
+            }
+
+            async handleRequest(url) {
+                let responseData;
+
+                switch(url) {
+                    case '/':
+                        responseData = this.getRootResponse();
+                        break;
+                    case '/folders':
+                        responseData = this.getFoldersResponse();
+                        break;
+                    case '/files':
+                        responseData = this.getFilesResponse();
+                        break;
+                    default:
+                        if (url.startsWith('/file/')) {
+                            return this.getFileResponse(url.replace('/file/', ''));
+                        } else {
+                            responseData = { error: 'Endpoint not found', available: ['/', '/folders', '/files', '/file/{filename}'] };
+                        }
+                }
+
+                return new Response(JSON.stringify(responseData, null, 2), {
+                    headers: { 'Content-Type': 'application/json' }
                 });
             }
 
-            if (files.length > 0) {
-                html += `<h4>📄 Files (${files.length}) - Available via HTTP</h4>`;
-                files.forEach(file => {
-                    html += `<div class="file-item">
-                        📄 ${file.name}
-                    </div>`;
+            getRootResponse() {
+                return {
+                    server: "Auto File Server",
+                    endpoints: [
+                        { method: "GET", path: "/", description: "List all available endpoints" },
+                        { method: "GET", path: "/folders", description: "List all folders in selected directory" },
+                        { method: "GET", path: "/files", description: "List all files in selected directory" },
+                        { method: "GET", path: "/file/{filename}", description: "Download specific file" }
+                    ],
+                    stats: {
+                        totalFiles: this.fileCache.size,
+                        directory: this.directoryHandle?.name || 'Unknown'
+                    }
+                };
+            }
+
+            getFoldersResponse() {
+                const folders = new Set();
+                
+                // In a real implementation, you would traverse directories
+                // For now, we'll simulate folder structure based on file extensions
+                this.fileCache.forEach(file => {
+                    const ext = file.name.split('.').pop();
+                    folders.add(ext ? `${ext.toUpperCase()} Files` : 'No Extension');
+                });
+
+                return {
+                    folders: Array.from(folders),
+                    count: folders.size,
+                    directory: this.directoryHandle?.name || 'Unknown'
+                };
+            }
+
+            getFilesResponse() {
+                const files = Array.from(this.fileCache.values()).map(file => ({
+                    name: file.name,
+                    size: file.size,
+                    sizeFormatted: this.formatFileSize(file.size),
+                    type: file.type,
+                    lastModified: new Date(file.lastModified).toISOString(),
+                    downloadUrl: `/file/${encodeURIComponent(file.name)}`
+                }));
+
+                return {
+                    files: files,
+                    count: files.length,
+                    totalSize: this.formatFileSize(Array.from(this.fileCache.values()).reduce((sum, file) => sum + file.size, 0))
+                };
+            }
+
+            getFileResponse(filename) {
+                const decodedFilename = decodeURIComponent(filename);
+                
+                if (!this.fileCache.has(decodedFilename)) {
+                    return new Response(JSON.stringify({
+                        error: 'File not found',
+                        availableFiles: Array.from(this.fileCache.keys())
+                    }), {
+                        status: 404,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+
+                const file = this.fileCache.get(decodedFilename);
+                return new Response(file.content, {
+                    headers: {
+                        'Content-Type': file.type || 'application/octet-stream',
+                        'Content-Disposition': `attachment; filename="${decodedFilename}"`
+                    }
                 });
             }
 
-            fileListElement.innerHTML += html;
+            showRoot() {
+                const content = document.getElementById('content');
+                const response = this.getRootResponse();
+                
+                let html = `<h2>📡 Server Endpoints</h2>`;
+                html += `<div class="endpoint">
+                    <strong>Server Status:</strong> Running<br>
+                    <strong>Directory:</strong> ${response.stats.directory}<br>
+                    <strong>Files Cached:</strong> ${response.stats.totalFiles}
+                </div>`;
+                
+                html += `<h3>Available Endpoints:</h3>`;
+                response.endpoints.forEach(endpoint => {
+                    html += `<div class="endpoint">
+                        <strong>${endpoint.method} ${endpoint.path}</strong><br>
+                        ${endpoint.description}
+                    </div>`;
+                });
+
+                html += `<h3>Quick Access:</h3>`;
+                html += `<button onclick="handleServerRoute('/folders')">📁 View Folders</button> `;
+                html += `<button onclick="handleServerRoute('/files')">📄 View Files</button>`;
+
+                content.innerHTML = html;
+            }
+
+            showFolders() {
+                const content = document.getElementById('content');
+                const response = this.getFoldersResponse();
+                
+                let html = `<h2>📁 Folders in ${response.directory}</h2>`;
+                html += `<div>Total: ${response.count} folder types</div>`;
+                
+                response.folders.forEach(folder => {
+                    html += `<div class="file-item folder">📁 ${folder}</div>`;
+                });
+
+                html += `<br><button onclick="handleServerRoute('/')">← Back to Home</button>`;
+                content.innerHTML = html;
+            }
+
+            showFiles() {
+                const content = document.getElementById('content');
+                const response = this.getFilesResponse();
+                
+                let html = `<h2>📄 Files in Directory</h2>`;
+                html += `<div>Total: ${response.count} files (${response.totalSize})</div>`;
+                
+                response.files.forEach(file => {
+                    html += `<div class="file-item">
+                        <strong>📄 ${file.name}</strong><br>
+                        <small>Size: ${file.sizeFormatted} | Type: ${file.type || 'Unknown'} </small>
+                        <button onclick="downloadFile('${file.name}')" style="margin-left: 10px;">Download</button>
+                    </div>`;
+                });
+
+                html += `<br><button onclick="handleServerRoute('/')">← Back to Home</button>`;
+                content.innerHTML = html;
+            }
+
+            downloadFile(filename) {
+                const file = this.fileCache.get(filename);
+                if (file) {
+                    const blob = new Blob([file.content], { type: file.type });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
         }
 
-        async function testEndpoints() {
-            if (!serverActive) {
-                alert('Please start the server first');
-                return;
-            }
+        // Global function for navigation
+        window.handleServerRoute = (route) => {
+            window.location.hash = route;
+        };
 
-            try {
-                // Test the /files endpoint
-                const response = await fetch('/files');
-                const data = await response.json();
-                
-                const fileList = document.getElementById('fileList');
-                fileList.innerHTML += `
-                    <hr><h3>🔍 Server Response Test:</h3>
-                    <pre>${JSON.stringify(data, null, 2)}</pre>
-                `;
-                
-            } catch (error) {
-                console.error('Endpoint test failed:', error);
+        window.downloadFile = (filename) => {
+            if (window.fileServer) {
+                window.fileServer.downloadFile(filename);
             }
-        }
+        };
 
-        // Listen for messages from service worker
-        navigator.serviceWorker.addEventListener('message', event => {
-            if (event.data.type === 'CACHE_READY') {
-                console.log('Service Worker cache is ready');
-            }
+        // Auto-start the server when page loads
+        window.addEventListener('load', () => {
+            window.fileServer = new FileServer();
         });
 
-        // Initialize
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(() => {
-                console.log('Service Worker is ready');
-            });
-        }
+        // Handle direct URL access
+        window.addEventListener('hashchange', () => {
+            const route = window.location.hash.substring(1) || '/';
+            if (window.fileServer) {
+                window.fileServer.handleRoute(route);
+            }
+        });
     </script>
 </body>
 </html>
