@@ -1,354 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Android Storage Explorer</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Analysis</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Arial', sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
-            min-height: 100vh;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
             padding: 20px;
+            background: #f5f5f5;
         }
+        
         .container {
-            max-width: 100%;
+            max-width: 800px;
             margin: 0 auto;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #2a2a2a;
+            background: white;
             border-radius: 10px;
-        }
-        .folder-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        .folder-item {
-            background: #333;
             padding: 20px;
-            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .loader {
             text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid #444;
+            padding: 40px;
         }
-        .folder-item:hover {
-            background: #444;
-            border-color: #667eea;
-            transform: translateY(-2px);
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 20px;
         }
-        .folder-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
+        
         .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
         }
-        .scanning { background: #004085; color: #b8daff; }
-        .success { background: #155724; color: #d4edda; }
-        .error { background: #721c24; color: #f8d7da; }
-        .info { background: #0c5460; color: #d1ecf1; }
-        .btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            cursor: pointer;
-            margin: 10px 5px;
+        
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #cce7ff; color: #004085; }
+        
+        .results {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .data-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .app-list, .contact-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            padding: 10px;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        
+        .app-item, .contact-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📱 Android Storage Explorer</h1>
-            <p>Self-Hosted • Real File Access</p>
+        <h1>Device Analysis</h1>
+        
+        <!-- Loader Section -->
+        <div id="loader" class="loader">
+            <div class="spinner"></div>
+            <h3>Analyzing your device...</h3>
+            <div id="statusMessages">
+                <div class="status info" id="initialStatus">Initializing analysis...</div>
+            </div>
         </div>
-
-        <div id="status" class="status scanning">
-            🔍 Requesting storage access...
-        </div>
-
-        <div id="permissionRequest" class="status info" style="display: none;">
-            <h3>📁 Storage Access Required</h3>
-            <p>This app needs access to your device storage to list folders.</p>
-            <button class="btn" onclick="grantStorageAccess()">Grant Storage Access</button>
-        </div>
-
-        <div id="content" style="display: none;">
-            <div class="folder-grid" id="folderGrid">
-                <!-- Real folders will be listed here -->
+        
+        <!-- Results Section -->
+        <div id="results" class="results">
+            <h2>Analysis Complete</h2>
+            
+            <div class="data-section">
+                <h3>📱 Device Information</h3>
+                <div id="deviceInfo" class="app-list"></div>
             </div>
             
-            <div class="status info">
-                <h4>📊 Storage Information</h4>
-                <div id="storageInfo"></div>
+            <div class="data-section">
+                <h3>📦 Installed Applications</h3>
+                <div id="installedApps" class="app-list"></div>
             </div>
-        </div>
-
-        <div id="error" class="status error" style="display: none;">
-            <!-- Error messages will appear here -->
+            
+            <div class="data-section">
+                <h3>👥 Contact Information</h3>
+                <div id="contactList" class="contact-list"></div>
+            </div>
         </div>
     </div>
 
-    <script>
-        class AndroidStorageExplorer {
-            constructor() {
-                this.rootHandle = null;
-                this.folders = [];
-                this.files = [];
-                this.autoStart();
-            }
-
-            async autoStart() {
-                try {
-                    const status = document.getElementById('status');
-                    
-                    // Check if File System Access API is available
-                    if (!('showDirectoryPicker' in window)) {
-                        throw new Error('Storage access not supported in this browser. Use Chrome 86+ on Android.');
-                    }
-
-                    // Auto-request storage access
-                    status.innerHTML = '🔓 Auto-requesting storage access...';
-                    await this.requestStorageAccess();
-                    
-                } catch (error) {
-                    if (error.name === 'AbortError') {
-                        this.showPermissionRequest();
-                    } else {
-                        this.showError(error.message);
-                    }
-                }
-            }
-
-            async requestStorageAccess() {
-                try {
-                    // Request directory access
-                    this.rootHandle = await window.showDirectoryPicker();
-                    
-                    const status = document.getElementById('status');
-                    status.innerHTML = '✅ Storage access granted!';
-                    status.className = 'status success';
-                    
-                    // Scan the directory
-                    await this.scanStorage();
-                    
-                } catch (error) {
-                    if (error.name === 'AbortError') {
-                        this.showPermissionRequest();
-                    } else {
-                        throw error;
-                    }
-                }
-            }
-
-            async scanStorage() {
-                const status = document.getElementById('status');
-                status.innerHTML = '🔍 Scanning storage...';
-                
-                this.folders = [];
-                this.files = [];
-
-                // Scan the root directory
-                for await (const entry of this.rootHandle.values()) {
-                    if (entry.kind === 'directory') {
-                        this.folders.push({
-                            name: entry.name,
-                            handle: entry,
-                            type: this.getFolderType(entry.name)
-                        });
-                    } else {
-                        this.files.push({
-                            name: entry.name,
-                            handle: entry
-                        });
-                    }
-                }
-
-                // Sort folders alphabetically
-                this.folders.sort((a, b) => a.name.localeCompare(b.name));
-                
-                status.innerHTML = `✅ Found ${this.folders.length} folders, ${this.files.length} files`;
-                this.displayRealFolders();
-            }
-
-            getFolderType(name) {
-                const systemFolders = ['android', 'system', 'data', 'cache', 'config'];
-                const mediaFolders = ['dcim', 'pictures', 'music', 'movies', 'downloads'];
-                const appFolders = ['whatsapp', 'telegram', 'instagram', 'documents'];
-                
-                const lowerName = name.toLowerCase();
-                
-                if (systemFolders.some(folder => lowerName.includes(folder))) return 'system';
-                if (mediaFolders.some(folder => lowerName.includes(folder))) return 'media';
-                if (appFolders.some(folder => lowerName.includes(folder))) return 'app';
-                return 'general';
-            }
-
-            displayRealFolders() {
-                document.getElementById('content').style.display = 'block';
-                const folderGrid = document.getElementById('folderGrid');
-                const storageInfo = document.getElementById('storageInfo');
-                
-                // Clear previous content
-                folderGrid.innerHTML = '';
-                
-                // Display folders
-                this.folders.forEach(folder => {
-                    const folderElement = document.createElement('div');
-                    folderElement.className = 'folder-item';
-                    folderElement.innerHTML = `
-                        <div class="folder-icon">${this.getFolderIcon(folder.type)}</div>
-                        <div class="folder-name">${folder.name}</div>
-                    `;
-                    
-                    folderElement.onclick = () => this.exploreFolder(folder);
-                    folderGrid.appendChild(folderElement);
-                });
-
-                // Display storage information
-                storageInfo.innerHTML = `
-                    <p><strong>Root Directory:</strong> ${this.rootHandle.name}</p>
-                    <p><strong>Total Folders:</strong> ${this.folders.length}</p>
-                    <p><strong>Total Files:</strong> ${this.files.length}</p>
-                    <p><strong>Access Level:</strong> Full directory access</p>
-                `;
-            }
-
-            getFolderIcon(type) {
-                const icons = {
-                    'system': '⚙️',
-                    'media': '🖼️',
-                    'app': '📱',
-                    'general': '📁'
-                };
-                return icons[type] || '📂';
-            }
-
-            async exploreFolder(folder) {
-                const status = document.getElementById('status');
-                status.innerHTML = `🔍 Exploring ${folder.name}...`;
-                
-                try {
-                    const subFolders = [];
-                    const subFiles = [];
-                    
-                    // Scan the subdirectory
-                    for await (const entry of folder.handle.values()) {
-                        if (entry.kind === 'directory') {
-                            subFolders.push({
-                                name: entry.name,
-                                handle: entry
-                            });
-                        } else {
-                            subFiles.push({
-                                name: entry.name,
-                                handle: entry
-                            });
-                        }
-                    }
-                    
-                    // Show folder contents
-                    this.showFolderContents(folder.name, subFolders, subFiles);
-                    
-                } catch (error) {
-                    this.showError(`Cannot access ${folder.name}: ${error.message}`);
-                }
-            }
-
-            showFolderContents(folderName, folders, files) {
-                const content = document.getElementById('content');
-                let html = `<h3>📁 Contents of ${folderName}</h3>`;
-                
-                if (folders.length > 0) {
-                    html += `<h4>📂 Subfolders (${folders.length})</h4>`;
-                    html += `<div class="folder-grid">`;
-                    folders.forEach(folder => {
-                        html += `
-                            <div class="folder-item" onclick="explorer.exploreFolder(${JSON.stringify(folder).replace(/"/g, '&quot;')})">
-                                <div class="folder-icon">📁</div>
-                                <div class="folder-name">${folder.name}</div>
-                            </div>
-                        `;
-                    });
-                    html += `</div>`;
-                }
-                
-                if (files.length > 0) {
-                    html += `<h4>📄 Files (${files.length})</h4>`;
-                    files.forEach(file => {
-                        html += `
-                            <div class="file-item" style="padding: 10px; border-bottom: 1px solid #444;">
-                                📄 ${file.name}
-                            </div>
-                        `;
-                    });
-                }
-                
-                if (folders.length === 0 && files.length === 0) {
-                    html += `<p>Empty folder</p>`;
-                }
-                
-                html += `<button class="btn" onclick="explorer.showRoot()" style="margin-top: 20px;">← Back to Root</button>`;
-                content.innerHTML = html;
-            }
-
-            showRoot() {
-                this.displayRealFolders();
-                document.getElementById('status').innerHTML = '✅ Browsing root directory';
-            }
-
-            showPermissionRequest() {
-                document.getElementById('permissionRequest').style.display = 'block';
-                document.getElementById('status').style.display = 'none';
-            }
-
-            showError(message) {
-                const errorDiv = document.getElementById('error');
-                errorDiv.style.display = 'block';
-                errorDiv.innerHTML = `❌ ${message}`;
-            }
-        }
-
-        // Global functions
-        async function grantStorageAccess() {
-            document.getElementById('permissionRequest').style.display = 'none';
-            document.getElementById('status').style.display = 'block';
-            
-            if (window.explorer) {
-                await window.explorer.requestStorageAccess();
-            }
-        }
-
-        // Auto-start the explorer
-        let explorer;
-        window.addEventListener('load', () => {
-            explorer = new AndroidStorageExplorer();
-            window.explorer = explorer; // Make it globally available
-        });
-
-        // Add beforeunload handler to show message when leaving
-        window.addEventListener('beforeunload', (event) => {
-            // Optional: Add confirmation message
-        });
-
-        // Service Worker for offline functionality
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(() => console.log('Service Worker registered'))
-                .catch(console.error);
-        }
-    </script>
+    <script src="sw.js"></script>
 </body>
 </html>
